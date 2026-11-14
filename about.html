@@ -287,6 +287,7 @@ async function tick() {
   if (!d.raw) { st.dataset.s = ''; txt.textContent = 'Waiting for the meter…'; }
   else if (age < 5) { st.dataset.s = 'live'; txt.textContent = 'Live'; }
   else { st.dataset.s = 'stale'; txt.textContent = `No data for ${Math.round(age)} s. Check the cable.`; }
+  if (d.errors) txt.textContent += ` · ${n(d.errors)} telegram errors (see log)`;
 
   $('#c-dev').textContent = d.device || 'not found';
   $('#c-count').textContent = `${n(d.ok)} valid telegrams · ${n(d.bad)} CRC failures`;
@@ -358,7 +359,7 @@ function renderLogger(db) {
     `<tr><td class="k">${fmtDT(new Date(c.ts * 1000))}</td><td>${TNAME[c.from - 1] || 'T' + c.from} → ${TNAME[c.to - 1] || 'T' + c.to}</td></tr>`).join('');
 }
 
-tick(); setInterval(tick, 2000);
+(async function loop() { try { await tick(); } catch {} setTimeout(loop, 2000); })();
 </script>
 </body>
 </html>

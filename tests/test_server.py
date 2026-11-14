@@ -14,7 +14,18 @@ import time  # noqa: E402
 
 import server  # noqa: E402
 from unittest import mock  # noqa: E402
-from server import Store, crc16, find_port, in_window, parse  # noqa: E402
+import json  # noqa: E402
+import threading  # noqa: E402
+import urllib.error  # noqa: E402
+import urllib.request  # noqa: E402
+from http.server import ThreadingHTTPServer  # noqa: E402
+
+from server import Config, Hub, Store, crc16, find_port, handle_telegram, in_window, make_handler, parse  # noqa: E402
+
+
+def telegram(lines):
+    body = b"/KFM5KAIFA-METER\r\n\r\n" + b"".join(l + b"\r\n" for l in lines) + b"!"
+    return body + b"%04X" % crc16(body)
 
 with open(os.path.join(HERE, "fixtures", "telegram.txt"), "rb") as fh:
     TELEGRAM = fh.read().rstrip(b"\r\n")
@@ -144,6 +155,68 @@ class RecentBackfill(unittest.TestCase):
             self.assertEqual([p[2] for p in pts], [1] * 4)  # flagged as averages
             self.assertAlmostEqual(pts[0][0], now - 55, delta=0.2)  # centred on the 10 s window
             self.assertEqual(pts[0][1], 200)
+
+
+class ReaderRobustness(unittest.TestCase):
+    def test_telegram_without_power_is_logged_not_fatal(self):
+        with tempfile.TemporaryDirectory() as d:
+            hub, st = Hub(), Store(os.path.join(d, "p1.sqlite"))
+            handle_telegram(telegram([b"1-0:1.8.11(000001.000*kWh)"]), hub, st)
+            self.assertEqual((hub.ok, hub.errors), (1, 0))
+            row = st.connect().execute("SELECT p_in, p_max, i1 FROM readings").fetchone()
+            self.assertEqual(row, (None, None, 1.0))
+
+    def test_unexpected_error_is_counted_and_reading_continues(self):
+        class Broken:
+            def add(self, rec):
+                raise RuntimeError("boom")
+        hub = Hub()
+        handle_telegram(TELEGRAM, hub, Broken())
+        handle_telegram(TELEGRAM, hub, Broken())
+        self.assertEqual((hub.ok, hub.errors), (2, 2))
+        self.assertIn("RuntimeError: boom", hub.last_error[1])
+        self.assertIsNotNone(hub.latest)  # the live view still got the reading
+
+    def test_bad_crc_counts_as_bad(self):
+        hub = Hub()
+        handle_telegram(TELEGRAM[:-4] + b"0000", hub, None)
+        self.assertEqual((hub.ok, hub.bad, hub.errors), (0, 1, 0))
+
+
+class Http(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.store = Store(os.path.join(cls.tmp.name, "p1.sqlite"))
+        cls.hub = Hub()
+        cfg = Config(os.path.join(cls.tmp.name, "config.json"))
+        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(cls.hub, cls.store, cfg))
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+        cls.base = f"http://127.0.0.1:{cls.srv.server_address[1]}"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+        cls.srv.server_close()
+        cls.tmp.cleanup()
+
+    def status(self, path, **kw):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(self.base + path, **kw), timeout=5) as r:
+                return r.status, r.read()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read()
+
+    def test_bad_parameters_return_400(self):
+        for path in ("/api/history?seconds=abc", "/api/hourly?date=2026-13-45", "/api/plans?days=x"):
+            self.assertEqual(self.status(path)[0], 400, path)
+
+    def test_meta_reports_age_and_errors(self):
+        code, body = self.status("/api/meta")
+        self.assertEqual(code, 200)
+        d = json.loads(body)
+        self.assertIn("age", d)
+        self.assertEqual(d["errors"], 0)
 
 
 if __name__ == "__main__":

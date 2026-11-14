@@ -129,6 +129,8 @@ class Hub:
         self.bad = 0             # CRC failures since start
         self.device = None
         self.started = time.time()
+        self.errors = 0          # unexpected errors while handling a telegram
+        self.last_error = None   # (ts, message) of the latest one
 
     def publish(self, rec):
         with self.cv:
@@ -176,14 +178,18 @@ class Store:
             return
         if self.wcon is None:
             self.wcon = self.connect()
-        w = self.window or [r["p_in"]]
+        w = self.window
         self.wcon.execute(
             "INSERT OR REPLACE INTO readings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (r["ts"], sum(w) / len(w), max(w), r["p_out"], r["v"], r["a"],
+            (r["ts"], sum(w) / len(w) if w else None, max(w) if w else None, r["p_out"], r["v"], r["a"],
              *r["imp"], *r["exp"], r["tariff"]),
         )
         self.wcon.commit()
         self._last, self.window = r["ts"], []
+
+    def reset_window(self):
+        """Drop power samples from before a reconnect, so they aren't averaged into the next row."""
+        self.window = []
 
     def history(self, seconds):
         bucket = max(LOG_EVERY, int(seconds // 400))
@@ -338,6 +344,37 @@ def find_port():
     return None
 
 
+def handle_telegram(tele, hub, store):
+    """Parse, publish and log one telegram. Never raises: one odd telegram must not
+    stop the reader while the web server keeps serving a frozen reading."""
+    try:
+        rec = parse(tele)
+        if not rec:
+            hub.bad += 1
+            return
+        hub.ok += 1
+        hub.raw, hub.raw_ts = tele.decode("ascii", "replace"), rec["ts"]
+        hub.publish(rec)
+        store.add(rec)
+    except Exception as err:  # noqa: BLE001 - logged and counted, reading continues
+        hub.errors += 1
+        hub.last_error = (time.time(), f"{type(err).__name__}: {err}")
+        if hub.errors <= 5 or hub.errors % 100 == 0:
+            print(f"telegram error #{hub.errors}: {hub.last_error[1]}", flush=True)
+
+
+def reader_supervisor(port, hub, store):
+    """Restart the reader if it ever dies, instead of leaving the server frozen."""
+    while True:
+        try:
+            reader(port, hub, store)
+        except Exception as err:  # noqa: BLE001
+            hub.errors += 1
+            hub.last_error = (time.time(), f"reader crashed: {type(err).__name__}: {err}")
+            print(hub.last_error[1], flush=True)
+            time.sleep(2)
+
+
 def reader(port, hub, store):
     last_err = None
     while True:
@@ -357,6 +394,7 @@ def reader(port, hub, store):
         last_err = None
         print(f"reading {dev}", flush=True)
         hub.device = dev
+        store.reset_window()
         buf = b""
         try:
             while True:
@@ -379,17 +417,7 @@ def reader(port, hub, store):
                         buf = buf[s:][-16384:]
                         break
                     tele, buf = buf[s:e + 5], buf[e + 5:]
-                    rec = parse(tele)
-                    if not rec:
-                        hub.bad += 1
-                    if rec:
-                        hub.ok += 1
-                        hub.raw, hub.raw_ts = tele.decode("ascii", "replace"), rec["ts"]
-                        hub.publish(rec)
-                        try:
-                            store.add(rec)
-                        except sqlite3.Error as err:
-                            print("sqlite:", err, flush=True)
+                    handle_telegram(tele, hub, store)
         except OSError as err:
             print(f"serial: {err}; retrying", flush=True)
             try:
@@ -457,6 +485,17 @@ def make_handler(hub, store, config):
                 self.send_error(400, str(err))
 
         def do_GET(self):
+            try:
+                self.route_get()
+            except ValueError as err:
+                self.send_error(400, f"bad request: {err}")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception as err:  # noqa: BLE001
+                print(f"GET {self.path}: {type(err).__name__}: {err}", flush=True)
+                self.send_error(500)
+
+        def route_get(self):
             u = urlparse(self.path)
             q = parse_qs(u.query)
             if u.path in ("/", "/index.html", "/about", "/about.html"):
@@ -474,6 +513,8 @@ def make_handler(hub, store, config):
                 self.send_json({
                     "raw": hub.raw, "raw_ts": hub.raw_ts, "ok": hub.ok, "bad": hub.bad,
                     "device": hub.device, "started": hub.started, "now": time.time(),
+                    "age": None if hub.raw_ts is None else round(time.time() - hub.raw_ts, 1),
+                    "errors": hub.errors, "last_error": hub.last_error,
                     "db": store.stats(),
                 })
             elif u.path == "/api/recent":
@@ -522,7 +563,7 @@ def main():
     args = ap.parse_args()
 
     hub, store = Hub(), Store(args.db)
-    threading.Thread(target=reader, args=(args.port, hub, store), daemon=True).start()
+    threading.Thread(target=reader_supervisor, args=(args.port, hub, store), daemon=True).start()
     srv = ThreadingHTTPServer((args.host, args.http), make_handler(hub, store, Config(os.path.join(HERE, "config.json"))))
     srv.daemon_threads = True
     print(f"dashboard: http://{'127.0.0.1' if args.host == '127.0.0.1' else args.host}:{args.http}", flush=True)
