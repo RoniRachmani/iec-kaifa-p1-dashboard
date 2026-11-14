@@ -30,7 +30,8 @@ open http://127.0.0.1:8765
 | Option | Default | |
 |---|---|---|
 | `--port` | auto-detect | Serial device |
-| `--host` | `127.0.0.1` | `0.0.0.0` to open it from a phone on your Wi-Fi network (no authentication) |
+| `--host` | `127.0.0.1` | `0.0.0.0` to open it from a phone on your Wi-Fi network. **No password:** anyone on that network can see your usage, which shows when you're home, and change prices |
+| `--allow-host` | — | Extra name the dashboard may be opened as, e.g. a DNS name for a Raspberry Pi. IP addresses, `localhost` and this computer's name are always allowed. Repeatable |
 | `--http` | `8765` | Web port |
 | `--db` | `data/p1.sqlite` | SQLite log, one row per 10 s |
 
@@ -58,6 +59,10 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.iec-kaifa-p1-dashb
 | Log | `~/Library/Logs/iec-kaifa-p1-dashboard.log` |
 
 Logging pauses while the Mac sleeps. See [`ESP32-READER.md`](ESP32-READER.md) for an always-on reader.
+
+## Security
+
+The server only answers requests addressed to this machine (an IP address, `localhost`, its own name or an `--allow-host` name). This blocks DNS-rebinding pages. Price changes must be JSON from the dashboard's own origin, so other websites open in your browser can't change them. Keep the default `--host 127.0.0.1` unless you trust everyone on your network.
 
 ## Prices and plans
 

@@ -11,10 +11,12 @@ dashboard at http://127.0.0.1:8765
 """
 import argparse
 import glob
+import ipaddress
 import json
 import os
 import re
 import select
+import socket
 import sqlite3
 import termios
 import threading
@@ -545,10 +547,37 @@ class Config:
 
 
 # ---------------------------------------------------------------- http
-def make_handler(hub, store, config):
+def host_allowed(host_header, extra=()):
+    """Accept a Host header naming this machine: an IP address, localhost, this computer's
+    name (or name.local), or a name passed with --allow-host. Anything else, such as an
+    attacker's domain re-pointed at 127.0.0.1 (DNS rebinding), is refused."""
+    if not host_header:
+        return False
+    host = host_header.strip().lower()
+    if host.startswith("["):                     # [::1]:8765
+        host = host[1:host.find("]")] if "]" in host else host
+    elif host.count(":") == 1:                   # 127.0.0.1:8765, name:8765
+        host = host.rsplit(":", 1)[0]
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        pass
+    me = socket.gethostname().lower().split(".")[0]
+    names = {"localhost", me, me + ".local", *(h.lower() for h in extra)}
+    return host in names
+
+
+def make_handler(hub, store, config, allow_hosts=()):
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
+
+        def refuse_foreign_host(self):
+            if host_allowed(self.headers.get("Host"), allow_hosts):
+                return False
+            self.send_error(403, "unknown Host; start the server with --allow-host NAME to allow it")
+            return True
 
         def send_json(self, obj):
             body = json.dumps(obj).encode()
@@ -560,8 +589,18 @@ def make_handler(hub, store, config):
             self.wfile.write(body)
 
         def do_POST(self):
+            if self.refuse_foreign_host():
+                return
             if urlparse(self.path).path != "/api/config":
                 return self.send_error(404)
+            # Browsers send a simple cross-site POST only as text/plain or a form, and always
+            # with an Origin header: requiring JSON and a same-origin Origin blocks other pages.
+            ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if ctype != "application/json":
+                return self.send_error(415, "Content-Type must be application/json")
+            origin = self.headers.get("Origin")
+            if origin is not None and urlparse(origin).netloc.lower() != (self.headers.get("Host") or "").lower():
+                return self.send_error(403, "cross-origin request refused")
             try:
                 n = int(self.headers.get("Content-Length", 0))
                 if n > 4096:
@@ -571,6 +610,8 @@ def make_handler(hub, store, config):
                 self.send_error(400, str(err))
 
         def do_GET(self):
+            if self.refuse_foreign_host():
+                return
             try:
                 self.route_get()
             except ValueError as err:
@@ -646,13 +687,19 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--http", type=int, default=8765)
     ap.add_argument("--db", default=os.path.join(HERE, "data", "p1.sqlite"))
+    ap.add_argument("--allow-host", action="append", default=[], metavar="NAME",
+                    help="extra host name the dashboard may be opened as (IP addresses, localhost "
+                         "and this computer's name are always allowed); repeatable")
     args = ap.parse_args()
 
     hub, store = Hub(), Store(args.db)
     threading.Thread(target=reader_supervisor, args=(args.port, hub, store), daemon=True).start()
-    srv = ThreadingHTTPServer((args.host, args.http), make_handler(hub, store, Config(os.path.join(HERE, "config.json"))))
+    srv = ThreadingHTTPServer((args.host, args.http), make_handler(hub, store, Config(os.path.join(HERE, "config.json")), args.allow_host))
     srv.daemon_threads = True
     print(f"dashboard: http://{'127.0.0.1' if args.host == '127.0.0.1' else args.host}:{args.http}", flush=True)
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        print("warning: listening beyond this computer. Anyone on the network can view your usage "
+              "and change prices; there is no password.", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

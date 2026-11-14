@@ -20,7 +20,7 @@ import urllib.error  # noqa: E402
 import urllib.request  # noqa: E402
 from http.server import ThreadingHTTPServer  # noqa: E402
 
-from server import Config, Hub, Store, crc16, find_port, handle_telegram, in_window, make_handler, parse  # noqa: E402
+from server import Config, Hub, Store, crc16, find_port, handle_telegram, host_allowed, in_window, make_handler, parse  # noqa: E402
 
 
 def telegram(lines):
@@ -222,6 +222,26 @@ class Http(unittest.TestCase):
         for path in ("/api/history?seconds=abc", "/api/hourly?date=2026-13-45", "/api/plans?days=x"):
             self.assertEqual(self.status(path)[0], 400, path)
 
+    def post_config(self, body=b'{"currency": "\u20aa", "prices": [0.6, 0.6, 0.6]}', **headers):
+        return self.status("/api/config", data=body, method="POST", headers=headers)[0]
+
+    def test_post_needs_json_content_type(self):
+        self.assertEqual(self.post_config(**{"Content-Type": "text/plain"}), 415)
+
+    def test_post_from_another_origin_is_refused(self):
+        self.assertEqual(self.post_config(**{"Content-Type": "application/json",
+                                             "Origin": "https://evil.example"}), 403)
+        self.assertEqual(self.post_config(**{"Content-Type": "application/json", "Origin": "null"}), 403)
+
+    def test_post_same_origin_and_no_origin_work(self):
+        host = self.base.split("//")[1]
+        self.assertEqual(self.post_config(**{"Content-Type": "application/json", "Origin": "http://" + host}), 200)
+        self.assertEqual(self.post_config(**{"Content-Type": "application/json"}), 200)  # curl, scripts
+
+    def test_foreign_host_header_is_refused(self):
+        self.assertEqual(self.status("/api/meta", headers={"Host": "rebind.evil.example:8765"})[0], 403)
+        self.assertEqual(self.status("/api/meta", headers={"Host": "localhost:8765"})[0], 200)
+
     def test_meta_reports_age_and_errors(self):
         code, body = self.status("/api/meta")
         self.assertEqual(code, 200)
@@ -233,6 +253,17 @@ class Http(unittest.TestCase):
 def rec(ts, regs, p_in=1000.0, tariff=3):
     return {"ts": ts, "p_in": p_in, "p_out": 0.0, "v": 230.0, "a": 4.3, "tariff": tariff,
             "imp": list(regs), "exp": [0.0, 0.0, 0.0]}
+
+
+class HostAllowed(unittest.TestCase):
+    def test_rules(self):
+        me = server.socket.gethostname().split(".")[0]
+        for h in ("127.0.0.1:8765", "[::1]:8765", "192.168.1.20:8765", "localhost:8765", "LOCALHOST",
+                  f"{me}:8765", f"{me}.local:8765"):
+            self.assertTrue(host_allowed(h), h)
+        for h in (None, "", "evil.example", "evil.example:8765", "localhost.evil.example"):
+            self.assertFalse(host_allowed(h), h)
+        self.assertTrue(host_allowed("pi-meter:8765", ["pi-meter"]))
 
 
 class Summary(unittest.TestCase):
