@@ -137,7 +137,7 @@ This Mac runs it as the launch agent `local.iec-kaifa-p1-dashboard` (installed f
 - `hours`: one row per local clock hour, holding kWh per counter, seconds covered, seconds on each tariff, row count and the hour's peak. It is keyed by the hour's real start time, so the 23- and 25-hour daylight-saving days are correct.
 - `tariff_changes`: one row per counter switch.
 
-Stats, the plan comparison and the hourly chart read only these, about 8,800 rows a year instead of about 3 million.
+Stats, the plan comparison and the hourly chart read only these, about 8,800 rows a year instead of about 3 million. Live logging only folds in readings newer than the last one, so after writing older readings (e.g. an ESP32 backfill) call `Store.rebuild_summary(since, until)` for that time range.
 
 **Intervals skipped:** gaps over 120 s, a missing counter value, a counter going backwards, and jumps implying more than 100 kW.
 

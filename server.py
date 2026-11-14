@@ -13,6 +13,7 @@ import argparse
 import glob
 import ipaddress
 import json
+import math
 import os
 import re
 import select
@@ -216,6 +217,7 @@ class Store:
         has_rows = con.execute("SELECT 1 FROM readings LIMIT 1").fetchone() is not None
         con.close()
         if empty and has_rows:
+            print("building the hourly summary from the log (one-time)…", flush=True)
             self.rebuild_summary()
         self.wcon = None
         self.window = []  # p_in samples since last row
@@ -227,31 +229,48 @@ class Store:
         con.close()
         return (row[0], list(row[1:4]), row[4]) if row else None
 
-    def _accumulate(self, con, prev, ts, regs, tariff, p_max):
-        """Fold one logged row into the hourly summary and tariff-change log."""
+    def _accumulate(self, con, prev, ts, regs, tariff, p_max, lo=-math.inf, hi=math.inf):
+        """Fold one logged row into the hourly summary and tariff-change log.
+        Only hours starting in [lo, hi) are written (used by a ranged rebuild)."""
         hts, day, hour, dow = local_hour(ts)
-        con.execute(UPSERT_HOUR, (hts, day, hour, dow, 0, 0, 0, 0, 0, 0, 0, 1, p_max, ts))
+        if lo <= hts < hi:
+            con.execute(UPSERT_HOUR, (hts, day, hour, dow, 0, 0, 0, 0, 0, 0, 0, 1, p_max, ts))
         if prev is None:
             return
         iv = interval(prev, (ts, regs, tariff))
         if iv:
             mid, dt, d = iv
             hts, day, hour, dow = local_hour(mid)
-            t = [dt if prev[2] == k else 0 for k in (1, 2, 3)]
-            con.execute(UPSERT_HOUR, (hts, day, hour, dow, *d, dt, *t, 0, None, None))
-        if prev[2] is not None and tariff is not None and prev[2] != tariff:
+            if lo <= hts < hi:
+                t = [dt if prev[2] == k else 0 for k in (1, 2, 3)]
+                con.execute(UPSERT_HOUR, (hts, day, hour, dow, *d, dt, *t, 0, None, None))
+        if prev[2] is not None and tariff is not None and prev[2] != tariff and lo <= ts < hi:
             con.execute("INSERT OR IGNORE INTO tariff_changes VALUES (?,?,?)", (ts, prev[2], tariff))
 
-    def rebuild_summary(self):
-        """Recompute hours and tariff_changes from the raw readings (one full scan)."""
+    def rebuild_summary(self, since=None, until=None):
+        """Recompute hours and tariff_changes from the raw readings, for everything or for the
+        local hours covering [since, until]. Call it after writing readings out of order (e.g. an
+        ESP32 backfill): Store.add only folds in readings newer than the last one.
+        Streams the rows, so memory stays flat on a large log."""
+        lo = -math.inf if since is None else local_hour(since)[0]
+        hi = math.inf if until is None else local_hour(until)[0] + 3600  # local hours are 3600 s
         con = self.connect()
-        con.execute("DELETE FROM hours")
-        con.execute("DELETE FROM tariff_changes")
-        prev = None
-        for ts, p_max, i1, i2, i3, tariff in con.execute(
-                "SELECT ts, p_max, i1, i2, i3, tariff FROM readings ORDER BY ts").fetchall():
-            self._accumulate(con, prev, ts, [i1, i2, i3], tariff, p_max)
-            prev = (ts, [i1, i2, i3], tariff)
+        con.execute("DELETE FROM hours WHERE hour_ts >= ? AND hour_ts < ?", (lo, hi))
+        con.execute("DELETE FROM tariff_changes WHERE ts >= ? AND ts < ?", (lo, hi))
+        # One row either side of the range supplies the neighbouring intervals.
+        before = con.execute("SELECT ts, i1, i2, i3, tariff FROM readings WHERE ts < ? "
+                             "ORDER BY ts DESC LIMIT 1", (lo,)).fetchone() if since is not None else None
+        prev = (before[0], list(before[1:4]), before[4]) if before else None
+        cur = con.cursor()
+        cur.execute("SELECT ts, p_max, i1, i2, i3, tariff FROM readings WHERE ts >= ? AND ts < ? "
+                    "ORDER BY ts", (lo, hi + MAX_GAP))
+        while True:
+            batch = cur.fetchmany(5000)
+            if not batch:
+                break
+            for ts, p_max, i1, i2, i3, tariff in batch:
+                self._accumulate(con, prev, ts, [i1, i2, i3], tariff, p_max, lo, hi)
+                prev = (ts, [i1, i2, i3], tariff)
         con.commit()
         con.close()
 

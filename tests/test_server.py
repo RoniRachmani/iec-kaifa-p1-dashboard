@@ -370,6 +370,29 @@ class Summary(unittest.TestCase):
         self.assertAlmostEqual(stats["tariff_secs"]["3"] + stats["tariff_secs"]["1"], 3990, places=3)
         st.close()
 
+    def test_late_rows_need_a_ranged_rebuild_that_matches_a_full_one(self):
+        st = Store(self.path)
+        t0 = 1_800_000_000
+        load = lambda k: k * 0.0005                      # about 180 W, cumulative kWh
+        for k in list(range(0, 300)) + list(range(700, 1000)):  # a 67-minute gap in the live log
+            st.add(rec(t0 + k * 10, [0.0, 0.0, load(k)], tariff=1 if k >= 850 else 3))
+        q = "SELECT hour_ts, round(d3, 6), round(secs, 3), round(t1, 3), round(t3, 3), n, p_max FROM hours ORDER BY 1"
+        before = query(st, q)
+        con = st.connect()                               # backfill the gap, as an ESP32 would
+        con.executemany("INSERT INTO readings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        [(t0 + k * 10, 1000.0, 1000.0, 0, 230, 4, 0.0, 0.0, load(k), 0, 0, 0, 3)
+                         for k in range(300, 700)])
+        con.commit(); con.close()
+        self.assertEqual(query(st, q), before)           # Store.add never saw them
+        st.rebuild_summary(t0 + 3000, t0 + 6990)
+        ranged = query(st, q)
+        self.assertNotEqual(ranged, before)
+        st.rebuild_summary()
+        self.assertEqual(query(st, q), ranged)           # same as recomputing everything
+        self.assertAlmostEqual(query(st, "SELECT SUM(d3) FROM hours")[0][0], load(999), places=6)
+        self.assertEqual([(c["from"], c["to"]) for c in st.stats()["tariff_changes"]], [(3, 1)])
+        st.close()
+
     def test_plans_use_whole_hour_windows(self):
         from datetime import datetime
         st = Store(self.path)
