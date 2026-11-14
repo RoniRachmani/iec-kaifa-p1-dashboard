@@ -27,6 +27,14 @@ def telegram(lines):
     body = b"/KFM5KAIFA-METER\r\n\r\n" + b"".join(l + b"\r\n" for l in lines) + b"!"
     return body + b"%04X" % crc16(body)
 
+
+def query(st, sql):
+    con = st.connect()
+    try:
+        return con.execute(sql).fetchall()
+    finally:
+        con.close()
+
 with open(os.path.join(HERE, "fixtures", "telegram.txt"), "rb") as fh:
     TELEGRAM = fh.read().rstrip(b"\r\n")
 
@@ -151,6 +159,7 @@ class RecentBackfill(unittest.TestCase):
                             (ts, 200 + k, 210, 0, 230, 1, 1, 0, 1, 0, 0, 0, 3))
             con.commit(); con.close()
             pts = st.recent(now - 900, now - 15)
+            st.close()
             self.assertEqual(len(pts), 4)                  # rows before the cut-off only
             self.assertEqual([p[2] for p in pts], [1] * 4)  # flagged as averages
             self.assertAlmostEqual(pts[0][0], now - 55, delta=0.2)  # centred on the 10 s window
@@ -163,7 +172,8 @@ class ReaderRobustness(unittest.TestCase):
             hub, st = Hub(), Store(os.path.join(d, "p1.sqlite"))
             handle_telegram(telegram([b"1-0:1.8.11(000001.000*kWh)"]), hub, st)
             self.assertEqual((hub.ok, hub.errors), (1, 0))
-            row = st.connect().execute("SELECT p_in, p_max, i1 FROM readings").fetchone()
+            row = query(st, "SELECT p_in, p_max, i1 FROM readings")[0]
+            st.close()
             self.assertEqual(row, (None, None, 1.0))
 
     def test_unexpected_error_is_counted_and_reading_continues(self):
@@ -205,7 +215,8 @@ class Http(unittest.TestCase):
             with urllib.request.urlopen(urllib.request.Request(self.base + path, **kw), timeout=5) as r:
                 return r.status, r.read()
         except urllib.error.HTTPError as e:
-            return e.code, e.read()
+            with e:
+                return e.code, e.read()
 
     def test_bad_parameters_return_400(self):
         for path in ("/api/history?seconds=abc", "/api/hourly?date=2026-13-45", "/api/plans?days=x"):
@@ -217,6 +228,115 @@ class Http(unittest.TestCase):
         d = json.loads(body)
         self.assertIn("age", d)
         self.assertEqual(d["errors"], 0)
+
+
+def rec(ts, regs, p_in=1000.0, tariff=3):
+    return {"ts": ts, "p_in": p_in, "p_out": 0.0, "v": 230.0, "a": 4.3, "tariff": tariff,
+            "imp": list(regs), "exp": [0.0, 0.0, 0.0]}
+
+
+class Summary(unittest.TestCase):
+    """The hourly summary table that stats, plans and the hourly chart read."""
+
+    def setUp(self):
+        self.old_tz = os.environ.get("TZ")
+        os.environ["TZ"] = "Asia/Jerusalem"  # DST dates below are Israel's
+        time.tzset()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.tmp.name, "p1.sqlite")
+
+    def tearDown(self):
+        if self.old_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = self.old_tz
+        time.tzset()
+        self.tmp.cleanup()
+
+    def raw_day(self, day, kw=1.0, step=10):
+        """Raw rows for one local day at a constant load, counted on T3."""
+        from datetime import datetime, time as dtime, timedelta
+        start = datetime.combine(day, dtime()).timestamp()
+        end = datetime.combine(day + timedelta(days=1), dtime()).timestamp()
+        con = Store(self.path).connect()
+        e, ts = 100.0, start
+        while ts < end:
+            con.execute("INSERT INTO readings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (ts, kw * 1000, kw * 1000, 0, 230, 4, 0.0, 0.0, e, 0, 0, 0, 3))
+            ts += step
+            e += kw * step / 3600
+        con.commit()
+        con.close()
+        st = Store(self.path)  # a fresh Store rebuilds the summary for existing data
+        return st
+
+    def test_autumn_day_has_25_hours(self):
+        from datetime import date
+        h = self.raw_day(date(2026, 10, 25)).hourly(date(2026, 10, 25))["hours"]
+        self.assertAlmostEqual(h[1][2], 2.0, places=2)   # 01:00-02:00 happens twice
+        self.assertAlmostEqual(h[0][2], 1.0, places=2)
+        self.assertAlmostEqual(h[23][2], 1.0, places=2)
+        self.assertAlmostEqual(sum(x[2] for x in h if x), 25.0, places=2)
+
+    def test_spring_day_has_23_hours(self):
+        from datetime import date
+        h = self.raw_day(date(2026, 3, 27)).hourly(date(2026, 3, 27))["hours"]
+        self.assertIsNone(h[2])                          # 02:00-03:00 doesn't exist
+        self.assertAlmostEqual(h[3][2], 1.0, places=2)
+        self.assertAlmostEqual(sum(x[2] for x in h if x), 23.0, places=2)
+
+    def test_missing_counter_is_skipped_not_a_spike(self):
+        st = Store(self.path)
+        t0 = 1_800_000_000
+        st.add(rec(t0, [1.0, 0.0, 2296.0]))
+        st.add(rec(t0 + 10, [1.0, 0.0, None]))          # one row lost its T3 value
+        st.add(rec(t0 + 20, [1.0, 0.0, 2296.01]))
+        total = query(st, "SELECT SUM(d1 + d2 + d3) FROM hours")[0][0]
+        st.close()
+        self.assertLess(total, 0.02)
+
+    def test_implausible_jump_and_counter_reset_are_skipped(self):
+        st = Store(self.path)
+        t0 = 1_800_000_000
+        st.add(rec(t0, [0.0, 0.0, 100.0]))
+        st.add(rec(t0 + 10, [0.0, 0.0, 150.0]))         # 50 kWh in 10 s = 18 MW
+        st.add(rec(t0 + 20, [0.0, 0.0, 10.0]))          # counter went backwards
+        st.add(rec(t0 + 30, [0.0, 0.0, 10.003]))        # normal: about 1 kW
+        total = query(st, "SELECT SUM(d3) FROM hours")[0][0]
+        st.close()
+        self.assertAlmostEqual(total, 0.003, places=6)
+
+    def test_live_matches_rebuild_and_repeats_are_ignored(self):
+        st = Store(self.path)
+        t0 = 1_800_000_000
+        for k in range(400):                             # a bit over an hour, tariff switch midway
+            st.add(rec(t0 + k * 10, [k * 0.001, 0.0, 5.0], p_in=900 + k, tariff=1 if k >= 200 else 3))
+        st.add(rec(t0 + 50, [0.05, 0.0, 5.0]))           # an old timestamp arriving late
+        q = "SELECT hour_ts, round(d1, 6), round(secs, 3), round(t1, 3), round(t3, 3), n, p_max FROM hours ORDER BY 1"
+        live = query(st, q)
+        st.rebuild_summary()
+        self.assertEqual(query(st, q), live)
+        stats = st.stats()
+        self.assertEqual(stats["rows"], 400)
+        self.assertEqual([(c["from"], c["to"]) for c in stats["tariff_changes"]], [(3, 1)])
+        self.assertAlmostEqual(stats["tariff_secs"]["3"] + stats["tariff_secs"]["1"], 3990, places=3)
+        st.close()
+
+    def test_plans_use_whole_hour_windows(self):
+        from datetime import datetime
+        st = Store(self.path)
+        # Sunday 1 Nov 2026, 22:00-00:00 local at 1 kW: 22-23 is outside the night window, 23-24 inside
+        t0 = datetime(2026, 11, 1, 22, 0).timestamp()
+        for k in range(721):
+            st.add(rec(t0 + k * 10, [0.0, 0.0, k * 10 / 3600]))
+        with mock.patch.object(server.time, "time", return_value=t0 + 7300):
+            r = st.plans([0.5, 0.5, 0.5], 28)
+        st.close()
+        night = next(p for p in r["plans"] if p["supplier"].startswith("Super") and p["name"] == "Night Plus")
+        fixed = next(p for p in r["plans"] if p["supplier"].startswith("Super") and p["name"] == "Fixed")
+        self.assertAlmostEqual(r["kwh"], 2.0, places=2)
+        self.assertAlmostEqual(night["share"], 0.5, places=2)
+        self.assertAlmostEqual(fixed["share"], 1.0, places=6)
 
 
 if __name__ == "__main__":

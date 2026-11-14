@@ -349,11 +349,11 @@ function renderLogger(db) {
   $('#l-last').textContent = db.last ? fmtDT(new Date(db.last * 1000)) : '—';
   $('#l-db').innerHTML = `${(db.bytes / 1024).toFixed(0)} KB · <code>data/p1.sqlite</code>`;
   if (db.first) $('#h-logger').textContent = `From ${fmtDT(new Date(db.first * 1000))}, while running`;
-  const share = db.tariff_rows || {}, total = Object.values(share).reduce((a, b) => a + b, 0);
+  const share = db.tariff_secs || {}, total = Object.values(share).reduce((a, b) => a + b, 0);
   const keys = Object.keys(share).filter(k => k !== 'null').sort();
   $('#share-bar').innerHTML = keys.map(k => `<i style="width:${share[k] / total * 100}%;background:var(${TV[k - 1] || '--text-muted'})"></i>`).join('');
   $('#share').innerHTML = keys.map(k => `<tr><td class="k"><i class="sw" style="background:var(${TV[k - 1] || '--text-muted'})"></i>${TNAME[k - 1] || 'T' + k}</td>
-    <td class="num">${fmtDur(share[k] * 10)}</td><td class="num">${(share[k] / total * 100).toFixed(1)}%</td></tr>`).join('') ||
+    <td class="num">${fmtDur(share[k])}</td><td class="num">${(share[k] / total * 100).toFixed(1)}%</td></tr>`).join('') ||
     '<tr><td class="k">No rows yet</td></tr>';
   if (db.tariff_changes?.length) $('#changes').innerHTML = db.tariff_changes.map(c =>
     `<tr><td class="k">${fmtDT(new Date(c.ts * 1000))}</td><td>${TNAME[c.from - 1] || 'T' + c.from} → ${TNAME[c.to - 1] || 'T' + c.to}</td></tr>`).join('');

@@ -133,6 +133,14 @@ This Mac runs it as the launch agent `local.iec-kaifa-p1-dashboard` (installed f
 
 **Database schema:** `readings(ts, p_in, p_max, p_out, v, a, i1, i2, i3, e1, e2, e3, tariff)`. Here `p_in` is the 10-second average in W, `p_max` the 10-second peak, `i1–3` / `e1–3` the import / export counters in kWh, and `ts` Unix time.
 
+**Summary tables** (kept up to date on every write; rebuilt automatically from `readings` if missing):
+- `hours`: one row per local clock hour, holding kWh per counter, seconds covered, seconds on each tariff, row count and the hour's peak. It is keyed by the hour's real start time, so the 23- and 25-hour daylight-saving days are correct.
+- `tariff_changes`: one row per counter switch.
+
+Stats, the plan comparison and the hourly chart read only these, about 8,800 rows a year instead of about 3 million.
+
+**Intervals skipped:** gaps over 120 s, a missing counter value, a counter going backwards, and jumps implying more than 100 kW.
+
 **First logged stats (01:20–01:24, 22 rows):** power 380–390 W (average 382 W), voltage 239 V.
 
 ## 7. Open questions & next steps

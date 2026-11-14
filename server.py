@@ -20,7 +20,7 @@ import termios
 import threading
 import time
 from collections import deque
-from datetime import date, datetime, time as dtime
+from datetime import date, datetime, time as dtime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -151,7 +151,57 @@ CREATE TABLE IF NOT EXISTS readings (
   ts REAL PRIMARY KEY, p_in REAL, p_max REAL, p_out REAL, v REAL, a REAL,
   i1 REAL, i2 REAL, i3 REAL, e1 REAL, e2 REAL, e3 REAL, tariff INTEGER
 );
+-- One row per local clock hour, kept up to date as readings arrive, so the
+-- dashboard never scans the raw table (about 3 million rows a year).
+CREATE TABLE IF NOT EXISTS hours (
+  hour_ts REAL PRIMARY KEY,           -- start of the local hour (epoch); DST-safe
+  day TEXT, hour INTEGER, dow INTEGER, -- local date, local hour 0-23, 0 = Sunday
+  d1 REAL DEFAULT 0, d2 REAL DEFAULT 0, d3 REAL DEFAULT 0,  -- kWh per import counter
+  secs REAL DEFAULT 0,                -- seconds covered by valid intervals
+  t1 REAL DEFAULT 0, t2 REAL DEFAULT 0, t3 REAL DEFAULT 0,  -- seconds on each tariff
+  n INTEGER DEFAULT 0,                -- raw rows logged in this hour
+  p_max REAL, p_max_ts REAL           -- highest 10-second peak and when
+);
+CREATE INDEX IF NOT EXISTS hours_day ON hours(day);
+CREATE TABLE IF NOT EXISTS tariff_changes (ts REAL PRIMARY KEY, prev INTEGER, tariff INTEGER);
 """
+
+UPSERT_HOUR = """
+INSERT INTO hours (hour_ts, day, hour, dow, d1, d2, d3, secs, t1, t2, t3, n, p_max, p_max_ts)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+ON CONFLICT(hour_ts) DO UPDATE SET
+  d1 = d1 + excluded.d1, d2 = d2 + excluded.d2, d3 = d3 + excluded.d3,
+  secs = secs + excluded.secs, t1 = t1 + excluded.t1, t2 = t2 + excluded.t2, t3 = t3 + excluded.t3,
+  n = n + excluded.n,
+  p_max_ts = CASE WHEN excluded.p_max IS NOT NULL AND (p_max IS NULL OR excluded.p_max > p_max)
+                  THEN excluded.p_max_ts ELSE p_max_ts END,
+  p_max = CASE WHEN excluded.p_max IS NOT NULL AND (p_max IS NULL OR excluded.p_max > p_max)
+               THEN excluded.p_max ELSE p_max END
+"""
+MAX_KW = 100  # an interval implying more than this is a glitch, not usage
+
+
+def local_hour(ts):
+    """(hour_ts, 'YYYY-MM-DD', hour, dow with 0 = Sunday) for the local hour containing ts.
+    Uses the fold flag, so the repeated hour when clocks go back gets its own hour_ts."""
+    lt = datetime.fromtimestamp(ts)
+    start = lt.replace(minute=0, second=0, microsecond=0)
+    return start.timestamp(), lt.date().isoformat(), lt.hour, (lt.weekday() + 1) % 7
+
+
+def interval(prev, cur):
+    """Energy between two logged rows (ts, [i1, i2, i3], tariff), or None when it can't be
+    trusted: a gap over MAX_GAP, a missing counter, a counter going backwards, or a jump
+    implying more than MAX_KW."""
+    dt = cur[0] - prev[0]
+    if not 0 < dt <= MAX_GAP:
+        return None
+    if any(v is None for v in prev[1]) or any(v is None for v in cur[1]):
+        return None
+    d = [c - p for c, p in zip(cur[1], prev[1])]
+    if min(d) < 0 or sum(d) / (dt / 3600) > MAX_KW:
+        return None
+    return (cur[0] + prev[0]) / 2, dt, d
 
 
 class Store:
@@ -160,9 +210,48 @@ class Store:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         con = self.connect()
         con.executescript(SCHEMA)
+        empty = con.execute("SELECT 1 FROM hours LIMIT 1").fetchone() is None
+        has_rows = con.execute("SELECT 1 FROM readings LIMIT 1").fetchone() is not None
         con.close()
+        if empty and has_rows:
+            self.rebuild_summary()
         self.wcon = None
         self.window = []  # p_in samples since last row
+        self.prev = self._last_row()
+
+    def _last_row(self):
+        con = self.connect()
+        row = con.execute("SELECT ts, i1, i2, i3, tariff FROM readings ORDER BY ts DESC LIMIT 1").fetchone()
+        con.close()
+        return (row[0], list(row[1:4]), row[4]) if row else None
+
+    def _accumulate(self, con, prev, ts, regs, tariff, p_max):
+        """Fold one logged row into the hourly summary and tariff-change log."""
+        hts, day, hour, dow = local_hour(ts)
+        con.execute(UPSERT_HOUR, (hts, day, hour, dow, 0, 0, 0, 0, 0, 0, 0, 1, p_max, ts))
+        if prev is None:
+            return
+        iv = interval(prev, (ts, regs, tariff))
+        if iv:
+            mid, dt, d = iv
+            hts, day, hour, dow = local_hour(mid)
+            t = [dt if prev[2] == k else 0 for k in (1, 2, 3)]
+            con.execute(UPSERT_HOUR, (hts, day, hour, dow, *d, dt, *t, 0, None, None))
+        if prev[2] is not None and tariff is not None and prev[2] != tariff:
+            con.execute("INSERT OR IGNORE INTO tariff_changes VALUES (?,?,?)", (ts, prev[2], tariff))
+
+    def rebuild_summary(self):
+        """Recompute hours and tariff_changes from the raw readings (one full scan)."""
+        con = self.connect()
+        con.execute("DELETE FROM hours")
+        con.execute("DELETE FROM tariff_changes")
+        prev = None
+        for ts, p_max, i1, i2, i3, tariff in con.execute(
+                "SELECT ts, p_max, i1, i2, i3, tariff FROM readings ORDER BY ts").fetchall():
+            self._accumulate(con, prev, ts, [i1, i2, i3], tariff, p_max)
+            prev = (ts, [i1, i2, i3], tariff)
+        con.commit()
+        con.close()
 
     def connect(self):
         con = sqlite3.connect(self.path, timeout=10)
@@ -179,13 +268,22 @@ class Store:
         if self.wcon is None:
             self.wcon = self.connect()
         w = self.window
+        p_max = max(w) if w else None
         self.wcon.execute(
             "INSERT OR REPLACE INTO readings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (r["ts"], sum(w) / len(w) if w else None, max(w) if w else None, r["p_out"], r["v"], r["a"],
+            (r["ts"], sum(w) / len(w) if w else None, p_max, r["p_out"], r["v"], r["a"],
              *r["imp"], *r["exp"], r["tariff"]),
         )
+        if self.prev is None or r["ts"] > self.prev[0]:  # never count the same moment twice
+            self._accumulate(self.wcon, self.prev, r["ts"], list(r["imp"]), r["tariff"], p_max)
+            self.prev = (r["ts"], list(r["imp"]), r["tariff"])
         self.wcon.commit()
         self._last, self.window = r["ts"], []
+
+    def close(self):
+        if self.wcon is not None:
+            self.wcon.close()
+            self.wcon = None
 
     def reset_window(self):
         """Drop power samples from before a reconnect, so they aren't averaged into the next row."""
@@ -214,35 +312,20 @@ class Store:
         return [[round(ts - LOG_EVERY / 2, 1), round(w, 1), 1] for ts, w in rows if w is not None]
 
     def stats(self):
+        """Logger summary. Reads only the small summary tables and the primary-key ends."""
         con = self.connect()
-        rows, first, last = con.execute("SELECT COUNT(*), MIN(ts), MAX(ts) FROM readings").fetchone()
+        first, last = con.execute("SELECT MIN(ts), MAX(ts) FROM readings").fetchone()
+        rows, t1, t2, t3 = con.execute(
+            "SELECT COALESCE(SUM(n), 0), SUM(t1), SUM(t2), SUM(t3) FROM hours").fetchone()
         changes = con.execute(
-            "SELECT ts, prev, tariff FROM (SELECT ts, tariff, LAG(tariff) OVER (ORDER BY ts) AS prev "
-            "FROM readings) WHERE prev IS NOT NULL AND prev != tariff ORDER BY ts DESC LIMIT 50"
-        ).fetchall()
-        share = con.execute("SELECT tariff, COUNT(*) FROM readings GROUP BY tariff").fetchall()
+            "SELECT ts, prev, tariff FROM tariff_changes ORDER BY ts DESC LIMIT 50").fetchall()
         con.close()
         size = sum(os.path.getsize(p) for p in (self.path, self.path + "-wal") if os.path.exists(p))
         return {
             "rows": rows, "first": first, "last": last, "bytes": size, "path": self.path,
             "tariff_changes": [{"ts": t, "from": a, "to": b} for t, a, b in changes],
-            "tariff_rows": {str(t): n for t, n in share},
+            "tariff_secs": {str(k): v for k, v in ((1, t1), (2, t2), (3, t3)) if v},
         }
-
-    def energy_intervals(self, since):
-        """Yield (mid_ts, [dkWh per import register]) for consecutive logged rows.
-        Gaps longer than MAX_GAP (cable out, Mac asleep) are skipped: we can't tell
-        when inside the gap that energy was used."""
-        con = self.connect()
-        cur = con.execute("SELECT ts, i1, i2, i3 FROM readings WHERE ts >= ? ORDER BY ts", (since,))
-        prev = None
-        for ts, *regs in cur:
-            regs = [r or 0.0 for r in regs]
-            if prev and 0 < ts - prev[0] <= MAX_GAP:
-                d = [max(0.0, regs[k] - prev[1][k]) for k in range(3)]
-                yield (ts + prev[0]) / 2, ts - prev[0], d
-            prev = (ts, regs)
-        con.close()
 
     def plans(self, prices, days):
         try:
@@ -256,13 +339,17 @@ class Store:
         in_kwh = [0.0] * len(plans)
         first = last = None
         dow_seen = set()
-        for mid, dt, d in self.energy_intervals(time.time() - days * 86400):
-            lt = datetime.fromtimestamp(mid)
-            sd = (lt.weekday() + 1) % 7          # 0 = Sunday
-            hour = lt.hour + lt.minute / 60
+        con = self.connect()
+        rows = con.execute(
+            "SELECT hour_ts, dow, hour, d1, d2, d3, secs FROM hours WHERE hour_ts >= ? AND secs > 0 "
+            "ORDER BY hour_ts", (time.time() - days * 86400,)).fetchall()
+        con.close()
+        # Plan windows start and end on whole hours, so hourly sums are exact.
+        for hts, sd, hour, d1, d2, d3, secs in rows:
+            d = (d1, d2, d3)
             e, c = sum(d), sum(d[k] * prices[k] for k in range(3))
-            covered += dt; kwh += e; cost += c
-            first = first or mid; last = mid
+            covered += secs; kwh += e; cost += c
+            first = first or hts; last = hts
             dow_seen.add(sd)
             for i, p in enumerate(plans):
                 if in_window(sd, hour, p):
@@ -286,35 +373,32 @@ class Store:
         }
 
     def hourly(self, day: date):
+        """kWh per local hour label (0-23) for one local day. A day can have 23 or 25 hours:
+        the skipped hour stays empty and the repeated hour's two halves add up."""
         start = datetime.combine(day, dtime()).timestamp()
+        end = datetime.combine(day + timedelta(days=1), dtime()).timestamp()
         con = self.connect()
         rows = con.execute(
-            "SELECT ts, i1, i2, i3, p_max FROM readings WHERE ts >= ? AND ts < ? ORDER BY ts",
-            (start, start + 86400 + 3600),
-        ).fetchall()
+            "SELECT hour, d1, d2, d3, n, p_max, p_max_ts FROM hours WHERE hour_ts >= ? AND hour_ts < ?",
+            (start, end)).fetchall()
+        first = con.execute(
+            "SELECT ts, i1, i2, i3 FROM readings WHERE ts >= ? AND ts < ? ORDER BY ts LIMIT 1",
+            (start, end)).fetchone()
         con.close()
-        first, last = {}, {}
-        for ts, i1, i2, i3, _ in rows:
-            h = int((ts - start) // 3600)
-            regs = (i1 or 0, i2 or 0, i3 or 0)
-            first.setdefault(h, regs)
-            last[h] = regs
-        hours = []
-        for h in range(24):
-            if h not in first:
-                hours.append(None)
-                continue
-            end = first.get(h + 1, last[h])
-            hours.append([round(max(0.0, end[k] - first[h][k]), 4) for k in range(3)])
-        today = [r for r in rows if r[0] < start + 86400]
-        peak = max(today, key=lambda r: r[4] or 0) if today else None
+        hours = [None] * 24
+        peak = None
+        for hour, d1, d2, d3, n, p_max, p_max_ts in rows:
+            if n or d1 or d2 or d3:
+                cur = hours[hour] or [0.0, 0.0, 0.0]
+                hours[hour] = [round(cur[0] + d1, 4), round(cur[1] + d2, 4), round(cur[2] + d3, 4)]
+            if p_max is not None and (peak is None or p_max > peak["w"]):
+                peak = {"ts": p_max_ts, "w": p_max}
         return {
             "start": start,
             "hours": hours,
-            "first": {"ts": today[0][0], "total": round(sum(x or 0 for x in today[0][1:4]), 3),
-                      "regs": [x or 0 for x in today[0][1:4]]}
-            if today else None,
-            "peak": {"ts": peak[0], "w": peak[4]} if peak else None,
+            "first": {"ts": first[0], "total": round(sum(x or 0 for x in first[1:4]), 3),
+                      "regs": [x or 0 for x in first[1:4]]} if first else None,
+            "peak": peak,
         }
 
 
