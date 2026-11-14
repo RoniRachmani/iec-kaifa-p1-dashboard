@@ -1,0 +1,29 @@
+{
+  "source": "Ministry of Energy price comparison, gov.il/he/pages/news-140126 (updated 15.07.2026)",
+  "notes": [
+    "Days: 0 = Sunday ... 6 = Saturday. Hours are local time; 'to' < 'from' means the window crosses midnight and belongs to the night it starts on.",
+    "Discounts apply to the energy charge only. Holidays are treated as normal days.",
+    "Not modelled: Cellcom 'small bill' (5-10% by consumption) and Pazgas (10% credit in the Yellow app, up to 50/month)."
+  ],
+  "plans": [
+    {"supplier": "Super Power (Electra)", "name": "Fixed", "discount": 6.5},
+    {"supplier": "Super Power (Electra)", "name": "Day", "discount": 16, "days": [0,1,2,3,4], "from": 7, "to": 17},
+    {"supplier": "Super Power (Electra)", "name": "Night Plus", "discount": 21, "days": [0,1,2,3,4], "from": 23, "to": 7},
+    {"supplier": "Bezeq Energy", "name": "Fixed", "discount": 6},
+    {"supplier": "Bezeq Energy", "name": "Smart day", "discount": 15, "days": [0,1,2,3,4], "from": 7, "to": 17},
+    {"supplier": "Bezeq Energy", "name": "Smart night", "discount": 20, "days": [0,1,2,3,4], "from": 23, "to": 7},
+    {"supplier": "Cellcom Energy", "name": "Fixed", "discount": 6},
+    {"supplier": "Cellcom Energy", "name": "Work from home", "discount": 15, "days": [0,1,2,3,4], "from": 7, "to": 17},
+    {"supplier": "Cellcom Energy", "name": "Afternoon / evening", "discount": 18, "days": [0,1,2,3,4], "from": 14, "to": 20},
+    {"supplier": "Cellcom Energy", "name": "Night", "discount": 20, "days": [0,1,2,3,4], "from": 23, "to": 7},
+    {"supplier": "Hot Energy", "name": "Fixed", "discount": 5},
+    {"supplier": "Hot Energy", "name": "Fixed, Hot Mobile / Next customers", "discount": 7, "condition": "Hot Mobile or Next customers only"},
+    {"supplier": "Hot Energy", "name": "Day", "discount": 15, "days": [0,1,2,3,4], "from": 7, "to": 17},
+    {"supplier": "Hot Energy", "name": "Night", "discount": 20, "days": [0,1,2,3,4], "from": 23, "to": 7},
+    {"supplier": "Amisragaz", "name": "Fixed", "discount": 7, "condition": "Amisragaz customers only"},
+    {"supplier": "Pazgas", "name": "Fixed", "discount": 6},
+    {"supplier": "Partner", "name": "Fixed", "discount": 5, "condition": "5% in year 1, 6% in year 2, 7% from year 3"},
+    {"supplier": "Partner", "name": "Work from home", "discount": 15, "days": [0,1,2,3,4], "from": 7, "to": 17},
+    {"supplier": "Partner", "name": "Night", "discount": 20, "days": [0,1,2,3,4], "from": 23, "to": 7}
+  ]
+}

@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Power</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f3f0; --surface-1: #fcfcfb; --border: #e6e5e1;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #77766f;
+  --grid: #ebeae6; --axis: #c9c8c3;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+  --area: color-mix(in srgb, var(--series-1) 14%, transparent);
+  --good: #0ca30c; --warning: #fab219;
+  --tip-bg: #1a1a19; --tip-text: #f0efec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --border: #2c2c2a;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+    --grid: #2a2a28; --axis: #4a4a46;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+    --area: color-mix(in srgb, var(--series-1) 20%, transparent);
+    --tip-bg: #f0efec; --tip-text: #1a1a19;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface-1: #1a1a19; --border: #2c2c2a;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+  --grid: #2a2a28; --axis: #4a4a46;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  --area: color-mix(in srgb, var(--series-1) 20%, transparent);
+  --tip-bg: #f0efec; --tip-text: #1a1a19;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text-primary);
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 16px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 20px; font-weight: 600; margin: 0; }
+h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+nav { display: flex; gap: 4px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+nav a { color: var(--text-secondary); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
+nav a[aria-current="page"] { background: var(--bg); color: var(--text-primary); }
+.status { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.status[data-s="live"] .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+.status[data-s="stale"] .dot { background: var(--warning); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.label { color: var(--text-secondary); font-size: 13px; }
+.hero-value { font-size: 56px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; margin-top: 6px; }
+.hero-value .unit { font-size: 22px; font-weight: 500; color: var(--text-secondary); margin-left: 6px; letter-spacing: 0; }
+.hero-sub, .sub { color: var(--text-muted); font-size: 13px; margin-top: 6px; }
+.tile .value { font-size: 26px; font-weight: 600; margin-top: 6px; }
+.tile .value small { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.seg button {
+  font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--text-secondary);
+  padding: 4px 10px; border-radius: 6px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.linkbtn { font: inherit; font-size: 13px; background: none; border: 0; color: var(--series-1); cursor: pointer; padding: 4px 0; }
+.chart { position: relative; height: 260px; touch-action: pan-y; }
+.chart.short { height: 220px; }
+.chart svg { display: block; overflow: visible; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .base { stroke: var(--axis); stroke-width: 1; }
+.chart .tick { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .line { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .area { fill: var(--area); stroke: none; }
+.chart .hl { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .hd { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+.chart .col:hover { fill: color-mix(in srgb, var(--text-primary) 5%, transparent); }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-muted); text-align: center; padding: 16px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--text-secondary); font-size: 13px; margin-bottom: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.tip {
+  position: fixed; z-index: 10; pointer-events: none; background: var(--tip-bg); color: var(--tip-text);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; white-space: nowrap;
+  box-shadow: 0 4px 16px rgb(0 0 0 / .2);
+}
+.tip b { font-weight: 600; }
+.tip .row { display: flex; align-items: center; gap: 6px; }
+.tip .row .v { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-secondary); font-weight: 500; }
+.right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ratebtn { font: inherit; font-size: 13px; color: var(--text-secondary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+.ratebtn:hover { color: var(--text-primary); }
+.panel { display: grid; gap: 12px; }
+.panel[hidden] { display: none; }
+.panel .fields { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.panel label { display: grid; gap: 4px; font-size: 13px; color: var(--text-secondary); }
+.panel input { font: inherit; width: 110px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text-primary); }
+.panel input.cur { width: 60px; }
+.panel .actions { display: flex; gap: 8px; align-items: center; }
+.btn { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text-primary); cursor: pointer; }
+.btn.primary { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+.hint { color: var(--text-muted); font-size: 12px; }
+.hero-cost { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.hero-cost b { font-size: 22px; font-weight: 600; }
+.hero-cost span { color: var(--text-secondary); font-size: 13px; }
+.plans { display: grid; gap: 2px; margin-top: 8px; }
+.prow { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) 6.5rem; gap: 12px; align-items: center; padding: 6px 4px; border-radius: 6px; }
+.prow:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+.prow .nm { font-size: 13px; min-width: 0; }
+.prow .nm b { font-weight: 600; }
+.prow .nm div { color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .track { height: 14px; }
+.prow .bar { height: 14px; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+.prow .val { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.prow .val div { color: var(--text-muted); font-size: 12px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px; margin-left: 6px;
+  background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--text-primary); vertical-align: 1px; }
+.notice { font-size: 13px; color: var(--text-secondary); background: color-mix(in srgb, var(--warning) 14%, transparent);
+  border-radius: 8px; padding: 8px 10px; margin-top: 4px; }
+@media (max-width: 760px) {
+  .prow { grid-template-columns: minmax(0, 1fr) 5.5rem; }
+  .prow .track { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width: 760px) {
+  .top { grid-template-columns: 1fr; }
+  .tiles { gap: 10px; }
+  .tile .value { font-size: 20px; }
+  .hero-value { font-size: 48px; }
+  .card { padding: 14px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="left"><h1>Home power</h1><nav><a href="/" aria-current="page">Dashboard</a><a href="/about">About</a></nav></div>
+    <div class="right">
+      <button class="ratebtn" id="rate-btn" aria-expanded="false">Price: —</button>
+      <div class="status" id="status"><span class="dot"></span><span id="status-text">Connecting…</span></div>
+    </div>
+  </header>
+
+  <section class="card panel" id="rate-panel" hidden>
+    <h2>Electricity price</h2>
+    <div class="hint">Price per kWh including VAT. The meter counts energy on three counters: T1 (probably IEC peak), T2 (unused) and T3 (probably off-peak).
+      On the IEC flat rate or a supplier's fixed discount every kWh costs the same, so use one price for all three. Only IEC time-of-use prices them differently.</div>
+    <div class="actions"><button class="btn" id="preset-flat">IEC flat rate: ₪0.6352</button><button class="btn" id="preset-tou">IEC time-of-use, this season</button></div>
+    <div class="fields">
+      <label>Currency<input class="cur" id="cfg-cur" maxlength="3"></label>
+      <label>T1 · peak<input id="cfg-p1" type="number" step="0.0001" min="0" inputmode="decimal"></label>
+      <label>T2 · unused<input id="cfg-p2" type="number" step="0.0001" min="0" inputmode="decimal"></label>
+      <label>T3 · off-peak<input id="cfg-p3" type="number" step="0.0001" min="0" inputmode="decimal"></label>
+    </div>
+    <div class="actions"><button class="btn primary" id="cfg-save">Save</button><button class="btn" id="cfg-cancel">Cancel</button><span class="hint" id="cfg-msg"></span></div>
+  </section>
+
+  <section class="top">
+    <div class="card">
+      <div class="label" id="hero-label">Using now</div>
+      <div class="hero-value"><span id="p-now">—</span><span class="unit" id="p-unit">W</span></div>
+      <div class="hero-sub" id="hero-sub">Waiting for the meter</div>
+      <div class="hero-cost"><b id="cost-hour">—</b><span id="cost-hour-sub">per hour at this rate</span></div>
+    </div>
+    <div class="tiles">
+      <div class="card tile"><div class="label">Today</div><div class="value" id="t-today">—</div><div class="sub" id="t-today-sub"></div></div>
+      <div class="card tile"><div class="label">Cost today</div><div class="value" id="t-cost">—</div><div class="sub" id="t-cost-sub"></div></div>
+      <div class="card tile"><div class="label">Peak today</div><div class="value" id="t-peak">—</div><div class="sub" id="t-peak-sub"></div></div>
+      <div class="card tile"><div class="label">Meter total</div><div class="value" id="t-total">—</div><div class="sub" id="t-total-sub"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Power</h2>
+      <div class="seg" id="range">
+        <button data-r="600">10 min</button><button data-r="3600">1 h</button><button data-r="86400">24 h</button><button data-r="604800">7 d</button>
+      </div>
+    </div>
+    <div class="chart" id="power-chart"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 id="hour-title">Energy by hour, today</h2>
+      <button class="linkbtn" id="tbl-toggle">Show table</button>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="chart short" id="hour-chart"></div>
+    <div id="hour-table" hidden></div>
+  </section>
+  <section class="card" id="plans-card">
+    <div class="card-head">
+      <h2>Supplier plans: estimated saving per month</h2>
+      <button class="linkbtn" id="plans-more">Show all plans</button>
+    </div>
+    <div class="sub" id="plans-sub">Loading…</div>
+    <div id="plans-notice"></div>
+    <div class="plans" id="plans"></div>
+    <div class="hint" id="plans-foot" style="margin-top:10px"></div>
+  </section>
+</main>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const TARIFF_VARS = ['--series-1', '--series-2', '--series-3'];
+// Meter counters 1-0:1.8.11/12/13. Peak/off-peak mapping inferred from IEC's TOU schedule (T3 active on a Saturday night); confirm with a weekday 17:00 switch.
+const TNAME = ['Peak (T1)', 'T2', 'Off-peak (T3)'];
+const tName = t => TNAME[(t || 1) - 1] || `T${t}`;
+// IEC prices incl. 18% VAT, from 1 July 2026 (₪/kWh)
+const IEC_FLAT = 0.6352;
+const IEC_TOU = { summer: [1.7223, 0.5042], winter: [1.1470, 0.4663], transition: [0.4958, 0.4578] };
+const season = (m = new Date().getMonth() + 1) => m >= 6 && m <= 9 ? 'summer' : (m === 12 || m <= 2) ? 'winter' : 'transition';
+const SEASON_NAME = { summer: 'summer', winter: 'winter', transition: 'spring/autumn' };
+function planLabel() {
+  const p = S.cfg.prices, f = flatPrice();
+  if (f === IEC_FLAT) return 'IEC flat rate';
+  for (const [k, [pk, op]] of Object.entries(IEC_TOU)) if (p[0] === pk && p[2] === op) return `IEC time-of-use, ${SEASON_NAME[k]}`;
+  return f != null ? 'flat rate' : 'custom prices';
+}
+const RANGES = [600, 3600, 86400, 604800];
+const S = { range: 600, live: [], hist: {}, hourly: null, last: null, lastAt: 0,
+  cfg: { currency: '₪', prices: [0.6352, 0.6352, 0.6352], estimated: true } };
+const money = v => v == null || isNaN(v) ? '—' : S.cfg.currency + (Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1));
+const flatPrice = () => S.cfg.prices.every(p => p === S.cfg.prices[0]) ? S.cfg.prices[0] : null;
+const priceFor = tariff => S.cfg.prices[(tariff || 1) - 1] ?? S.cfg.prices[0];
+const costRow = w => { const p = S.last ? priceFor(S.last.tariff) : flatPrice();
+  return p == null ? '' : `<div class="row">Cost<span class="v">${money(w / 1000 * p)}/h</span></div>`; };
+try { const r = +localStorage.getItem('p1.range'); if (RANGES.includes(r)) S.range = r; } catch {}
+
+// ---------- formatting
+const powerParts = w => w >= 1000 ? [(w / 1000).toFixed(2), 'kW'] : [String(Math.round(w)), 'W'];
+const fmtW = w => w == null ? '—' : powerParts(w).join(' ');
+const fmtAxisW = w => w >= 1000 ? (w / 1000).toFixed(w % 1000 ? 1 : 0) + ' kW' : w + ' W';
+const fmtKwh = k => k >= 1000 ? Math.round(k).toLocaleString() : k.toFixed(k < 10 ? 2 : 1);
+const tf = (t, o) => new Date(t * 1000).toLocaleTimeString([], o);
+const hhmm = t => tf(t, { hour: '2-digit', minute: '2-digit' });
+const hhmmss = t => tf(t, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const dayHHmm = t => new Date(t * 1000).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+const meterClock = s => s && s.length >= 12 ? `${s.slice(6, 8)}:${s.slice(8, 10)}:${s.slice(10, 12)}` : '';
+const tzOff = () => -new Date().getTimezoneOffset() * 60;
+
+function niceTicks(max) {
+  let step = Math.pow(10, Math.floor(Math.log10(max / 4)));
+  for (const m of [1, 2, 2.5, 5, 10]) { if (max / (step * m) <= 5) { step *= m; break; } }
+  const out = []; for (let v = 0; v <= max + step * 0.999; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+
+// ---------- tooltip
+const tip = $('#tip');
+function showTip(x, y, html) {
+  tip.innerHTML = html; tip.hidden = false;
+  const r = tip.getBoundingClientRect(), pad = 12;
+  let left = x + pad, top = y - r.height - pad;
+  if (left + r.width > innerWidth - 8) left = x - r.width - pad;
+  if (top < 8) top = y + pad;
+  tip.style.left = Math.max(8, left) + 'px'; tip.style.top = top + 'px';
+}
+const hideTip = () => { tip.hidden = true; };
+
+// ---------- line chart (power)
+function lineChart(el, pts, o) {
+  const W = el.clientWidth, H = el.clientHeight, m = { l: 52, r: 10, t: 10, b: 26 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  if (!pts.length) { el.innerHTML = `<div class="empty">${o.empty}</div>`; return; }
+  const ticks = niceTicks(Math.max(100, ...pts.map(p => p.v)) * 1.05), ymax = ticks.at(-1);
+  const x = t => m.l + (t - o.x0) / (o.x1 - o.x0) * iw, y = v => m.t + ih - v / ymax * ih;
+  const segs = []; let cur = [];
+  pts.forEach((p, i) => { if (i && p.t - pts[i - 1].t > o.gap) { segs.push(cur); cur = []; } cur.push(p); });
+  segs.push(cur);
+  let line = '', area = '';
+  for (const s of segs) {
+    const d = s.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ',' + y(p.v).toFixed(1)).join('');
+    line += d;
+    area += d + `L${x(s.at(-1).t).toFixed(1)},${y(0)}L${x(s[0].t).toFixed(1)},${y(0)}Z`;
+  }
+  let g = ticks.map(v => `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/>` +
+    `<text class="tick" x="${m.l - 8}" y="${y(v)}" text-anchor="end" dominant-baseline="middle">${fmtAxisW(v)}</text>`).join('');
+  const step = { 600: 120, 3600: 600, 86400: 4 * 3600, 604800: 86400 }[o.span];
+  for (let t = Math.ceil((o.x0 + tzOff()) / step) * step - tzOff(); t <= o.x1; t += step) {
+    const lbl = o.span === 604800 ? new Date(t * 1000).toLocaleDateString([], { weekday: 'short' }) : hhmm(t);
+    g += `<text class="tick" x="${x(t)}" y="${H - 6}" text-anchor="middle">${lbl}</text>`;
+  }
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="Power over time">${g}
+    <path class="area" d="${area}"/><path class="line" d="${line}"/>
+    <line class="base" x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}"/>
+    <g class="hov" visibility="hidden"><line class="hl" y1="${m.t}" y2="${m.t + ih}"/><circle class="hd" r="4.5"/></g>
+    <rect class="ov" x="${m.l}" y="0" width="${iw}" height="${H}" fill="transparent"/></svg>`;
+  const hov = el.querySelector('.hov'), hl = el.querySelector('.hl'), hd = el.querySelector('.hd');
+  const at = (cx, cy) => {
+    const r = el.getBoundingClientRect(), t = o.x0 + (cx - r.left - m.l) / iw * (o.x1 - o.x0);
+    let lo = 0, hi = pts.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (pts[mid].t < t) lo = mid + 1; else hi = mid; }
+    if (lo > 0 && t - pts[lo - 1].t < pts[lo].t - t) lo--;
+    const p = pts[lo], px = x(p.t);
+    hl.setAttribute('x1', px); hl.setAttribute('x2', px); hd.setAttribute('cx', px); hd.setAttribute('cy', y(p.v));
+    hov.setAttribute('visibility', 'visible');
+    showTip(cx, cy, o.tip(p));
+  };
+  const ov = el.querySelector('.ov');
+  ov.addEventListener('pointermove', e => { el._hover = [e.clientX, e.clientY]; at(e.clientX, e.clientY); });
+  ov.addEventListener('pointerleave', () => { el._hover = null; hov.setAttribute('visibility', 'hidden'); hideTip(); });
+  if (el._hover) at(...el._hover);
+}
+
+function renderPower() {
+  const el = $('#power-chart'), now = Date.now() / 1000, R = S.range;
+  if (R === 600) {
+    // Points flagged avg come from the 10-second log (filled in after a server restart).
+    const pts = S.live.filter(p => p[0] >= now - 600 && p[1] != null).map(p => ({ t: p[0], v: p[1], avg: !!p[2] }));
+    lineChart(el, pts, { x0: now - 600, x1: now, span: 600, gap: 25, empty: 'Waiting for live readings…',
+      tip: p => `<b>${hhmmss(p.t)}</b><div class="row">${p.avg ? 'Power (10 s avg)' : 'Power'}<span class="v">${fmtW(p.v)}</span></div>${costRow(p.v)}` });
+  } else {
+    const h = S.hist[R];
+    if (!h) { el.innerHTML = '<div class="empty">Loading…</div>'; return; }
+    const pts = h.points.map(([t, v, mx]) => ({ t: t + h.bucket / 2, v, mx, b: t }));
+    lineChart(el, pts, { x0: now - R, x1: now, span: R, gap: h.bucket * 3,
+      empty: 'No history for this range yet. It fills in while the server keeps running.',
+      tip: p => `<b>${(R > 86400 ? dayHHmm : hhmm)(p.b)}–${hhmm(p.b + h.bucket)}</b>
+        <div class="row">Average<span class="v">${fmtW(p.v)}</span></div>
+        <div class="row">Peak<span class="v">${fmtW(p.mx)}</span></div>${flatPrice() != null ? costRow(p.v).replace('Cost', 'Avg cost') : ''}` });
+  }
+}
+
+async function loadHist(R) {
+  try { S.hist[R] = await (await fetch('/api/history?seconds=' + R)).json(); } catch {}
+  if (S.range === R) renderPower();
+}
+
+// ---------- hourly bars
+function roundTop(x, y, w, h, r) {
+  r = Math.min(r, h, w / 2);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+function renderHourly() {
+  const d = S.hourly, el = $('#hour-chart');
+  if (!d) return;
+  const hours = d.hours.map(h => h || [0, 0, 0]);
+  const present = [0, 1, 2].filter(k => hours.some(h => h[k] > 0.0005));
+  $('#legend').innerHTML = present.length > 1
+    ? present.map(k => `<span><i class="sw" style="background:var(${TARIFF_VARS[k]})"></i>${TNAME[k]}</span>`).join('')
+    : present.length ? `<span>All on ${TNAME[present[0]]} so far</span>` : '';
+  const totals = hours.map(h => h[0] + h[1] + h[2]);
+  if (!totals.some(v => v > 0)) { el.innerHTML = '<div class="empty">No energy logged today yet.</div>'; renderTable(hours, totals); return; }
+  const W = el.clientWidth, H = el.clientHeight, m = { l: 52, r: 10, t: 10, b: 26 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, band = iw / 24, bw = Math.min(28, band - 2);
+  const ticks = niceTicks(Math.max(0.1, ...totals) * 1.05), ymax = ticks.at(-1);
+  const y = v => m.t + ih - v / ymax * ih;
+  let g = ticks.map(v => `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/>` +
+    `<text class="tick" x="${m.l - 8}" y="${y(v)}" text-anchor="end" dominant-baseline="middle">${v} kWh</text>`).join('');
+  for (let h = 0; h < 24; h += 3) g += `<text class="tick" x="${m.l + band * h + band / 2}" y="${H - 6}" text-anchor="middle">${String(h).padStart(2, '0')}</text>`;
+  let bars = '', cols = '';
+  hours.forEach((hv, h) => {
+    const x0 = m.l + band * h + (band - bw) / 2;
+    const segs = [0, 1, 2].filter(k => hv[k] > 0);
+    let base = y(0);
+    segs.forEach((k, i) => {
+      let ht = hv[k] / ymax * ih; if (i > 0) { base -= 2; ht -= 2; }
+      if (ht <= 0.5) return;
+      const top = base - ht, isTop = i === segs.length - 1;
+      bars += isTop ? `<path d="${roundTop(x0, top, bw, ht, 4)}" style="fill:var(${TARIFF_VARS[k]})"/>`
+                    : `<rect x="${x0}" y="${top}" width="${bw}" height="${ht}" style="fill:var(${TARIFF_VARS[k]})"/>`;
+      base = top;
+    });
+    cols += `<rect class="col" data-h="${h}" x="${m.l + band * h}" y="${m.t}" width="${band}" height="${ih}" fill="transparent"/>`;
+  });
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="Energy by hour">${g}${cols}${bars}
+    <line class="base" x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}"/></svg>`;
+  el.querySelectorAll('.col').forEach(c => {
+    c.addEventListener('pointermove', e => {
+      const h = +c.dataset.h, hv = hours[h];
+      const rows = [0, 1, 2].filter(k => hv[k] > 0).map(k =>
+        `<div class="row"><i class="sw" style="background:var(${TARIFF_VARS[k]})"></i>${TNAME[k]}<span class="v">${hv[k].toFixed(3)} kWh</span></div>`).join('');
+      showTip(e.clientX, e.clientY, `<b>${String(h).padStart(2, '0')}:00–${String(h + 1).padStart(2, '0')}:00</b>` +
+        (rows || '<div>No data</div>') + (totals[h] ? `<div class="row">Total<span class="v">${totals[h].toFixed(3)} kWh</span></div>
+        <div class="row">Cost<span class="v">${money(hourCost(hv))}</span></div>` : ''));
+    });
+    c.addEventListener('pointerleave', hideTip);
+  });
+  renderTable(hours, totals);
+}
+const hourCost = hv => hv.reduce((s, v, k) => s + v * S.cfg.prices[k], 0);
+function renderTable(hours, totals) {
+  const sum = totals.reduce((a, b) => a + b, 0), cost = hours.reduce((s, h) => s + hourCost(h), 0);
+  $('#hour-table').innerHTML = `<table><thead><tr><th>Hour</th><th>Peak (T1)</th><th>T2</th><th>Off-peak (T3)</th><th>Total kWh</th><th>Cost</th></tr></thead><tbody>` +
+    hours.map((h, i) => totals[i] ? `<tr><td>${String(i).padStart(2, '0')}:00</td>${h.map(v => `<td>${v.toFixed(3)}</td>`).join('')}<td>${totals[i].toFixed(3)}</td><td>${money(hourCost(h))}</td></tr>` : '').join('') +
+    (sum ? `<tr><th>Total</th><td></td><td></td><td></td><th>${sum.toFixed(3)}</th><th>${money(cost)}</th></tr>` : '') +
+    `</tbody></table>`;
+}
+async function loadHourly() {
+  try { S.hourly = await (await fetch('/api/hourly')).json(); } catch { return; }
+  renderHourly(); renderTiles();
+}
+
+// ---------- hero & tiles
+function renderHero() {
+  const r = S.last; if (!r) return;
+  const exporting = (r.p_out || 0) > 0 && !(r.p_in > 0);
+  const [v, u] = powerParts(exporting ? r.p_out : r.p_in);
+  $('#hero-label').textContent = exporting ? 'Exporting now' : 'Using now';
+  $('#p-now').textContent = v; $('#p-unit').textContent = u;
+  const ph = r.phases || [], three = ph.length > 1;
+  const per = (k, d, u) => ph.map(p => p[k] == null ? '–' : p[k].toFixed(d)).join(' / ') + ' ' + u;
+  $('#hero-sub').textContent = [
+    three ? `L${ph.map(p => p.l).join('/L')} ${per('v', 0, 'V')}` : r.v != null && `${r.v.toFixed(1)} V`,
+    three ? per('a', 1, 'A') : r.a != null && `${r.a.toFixed(1)} A`,
+    r.tariff != null && `Counter: ${tName(r.tariff)}`].filter(Boolean).join(' · ');
+  const price = priceFor(r.tariff);
+  $('#cost-hour').textContent = exporting ? '—' : money((r.p_in || 0) / 1000 * price);
+  $('#cost-hour-sub').textContent = `per hour · ${S.cfg.currency}${price}/kWh, ${planLabel()}${flatPrice() == null ? `, now ${tName(r.tariff)}` : ''}${S.cfg.estimated ? ' (estimated price)' : ''}`;
+}
+function renderTiles() {
+  const r = S.last, d = S.hourly;
+  if (r) {
+    $('#t-total').innerHTML = `${fmtKwh(r.imp_total)}<small>kWh</small>`;
+    $('#t-total-sub').textContent = r.exp_total > 0 ? `${fmtKwh(r.exp_total)} kWh exported` : 'Imported from the grid';
+  }
+  if (r && d && d.first) {
+    $('#t-today').innerHTML = `${fmtKwh(Math.max(0, r.imp_total - d.first.total))}<small>kWh</small>`;
+    $('#t-today-sub').textContent = d.first.ts - d.start > 120 ? `Since ${hhmm(d.first.ts)}, when logging started` : 'Since midnight';
+  }
+  if (r && d && d.first && d.first.regs) {
+    const c = r.imp.reduce((s, v, k) => s + Math.max(0, (v || 0) - (d.first.regs[k] || 0)) * S.cfg.prices[k], 0);
+    $('#t-cost').textContent = money(c);
+    $('#t-cost-sub').textContent = S.cfg.estimated ? 'Estimated price. Set yours above.' : `Energy only, at ${planLabel()}. Fixed charges not included.`;
+  }
+  if (d && d.peak) {
+    let w = d.peak.w, t = d.peak.ts;
+    if (r && r.p_in > w) { w = r.p_in; t = r.ts; }
+    const [v, u] = powerParts(w);
+    $('#t-peak').innerHTML = `${v}<small>${u}</small>`;
+    $('#t-peak-sub').textContent = `At ${hhmm(t)}`;
+  }
+}
+
+// ---------- status
+setInterval(() => {
+  const st = $('#status'), txt = $('#status-text');
+  if (!S.lastAt) { st.dataset.s = ''; txt.textContent = 'Waiting for the meter…'; return; }
+  const age = (Date.now() - S.lastAt) / 1000;
+  if (age < 5) { st.dataset.s = 'live'; txt.textContent = `Live · meter clock ${meterClock(S.last.meter_time)}`; }
+  else { st.dataset.s = 'stale'; txt.textContent = `No data for ${Math.round(age)} s. Check the cable.`; }
+}, 1000);
+
+// ---------- wiring
+function onRec(r) {
+  S.last = r; S.lastAt = Date.now();
+  S.live.push([r.ts, r.p_in]);
+  const cut = r.ts - 900; while (S.live.length && S.live[0][0] < cut) S.live.shift();
+  renderHero(); renderTiles();
+  if (S.range === 600) renderPower();
+}
+function setRange(R) {
+  S.range = R; try { localStorage.setItem('p1.range', R); } catch {}
+  document.querySelectorAll('#range button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.r === R));
+  hideTip(); $('#power-chart')._hover = null;
+  renderPower(); if (R !== 600) loadHist(R);
+}
+$('#range').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setRange(+b.dataset.r); });
+$('#tbl-toggle').addEventListener('click', () => {
+  const t = $('#hour-table'); t.hidden = !t.hidden; $('#tbl-toggle').textContent = t.hidden ? 'Show table' : 'Hide table';
+});
+// ---------- price settings
+function renderRateBtn() {
+  const f = flatPrice();
+  $('#rate-btn').textContent = `Price: ${f != null ? `${S.cfg.currency}${f}/kWh` : `${S.cfg.currency}${S.cfg.prices[0]} peak / ${S.cfg.currency}${S.cfg.prices[2]} off-peak`} · ${S.cfg.estimated ? 'estimate' : planLabel()}`;
+}
+async function loadConfig() {
+  try { S.cfg = await (await fetch('/api/config')).json(); } catch {}
+  renderRateBtn();
+}
+function openPanel(open) {
+  $('#rate-panel').hidden = !open; $('#rate-btn').setAttribute('aria-expanded', open);
+  if (open) {
+    $('#cfg-cur').value = S.cfg.currency;
+    S.cfg.prices.forEach((p, i) => { $('#cfg-p' + (i + 1)).value = p; });
+    $('#cfg-msg').textContent = ''; $('#cfg-p1').focus();
+  }
+}
+$('#rate-btn').addEventListener('click', () => openPanel($('#rate-panel').hidden));
+const setFields = ps => ps.forEach((p, i) => { $('#cfg-p' + (i + 1)).value = p; });
+$('#preset-flat').addEventListener('click', () => { setFields([IEC_FLAT, IEC_FLAT, IEC_FLAT]); $('#cfg-msg').textContent = 'IEC flat home rate, incl. VAT. Press Save.'; });
+$('#preset-tou').addEventListener('click', () => {
+  const s = season(), [pk, op] = IEC_TOU[s];
+  setFields([pk, op, op]);
+  $('#cfg-msg').textContent = `IEC time-of-use, ${SEASON_NAME[s]}: peak ₪${pk}, off-peak ₪${op}. Seasonal prices change on 1 Dec, 1 Mar, 1 Jun and 1 Oct. Press Save.`;
+});
+$('#cfg-cancel').addEventListener('click', () => openPanel(false));
+$('#cfg-save').addEventListener('click', async () => {
+  const prices = [1, 2, 3].map(i => parseFloat($('#cfg-p' + i).value));
+  if (prices.some(p => !(p >= 0 && p < 100))) { $('#cfg-msg').textContent = 'Enter a price between 0 and 100 for each counter.'; return; }
+  try {
+    const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currency: $('#cfg-cur').value.trim() || '₪', prices }) });
+    if (!res.ok) throw new Error(await res.text());
+    S.cfg = await res.json();
+  } catch (e) { $('#cfg-msg').textContent = 'Could not save: ' + e.message; return; }
+  renderRateBtn(); renderHero(); renderTiles(); renderHourly(); renderPower(); loadPlans(); openPanel(false);
+});
+
+// ---------- supplier plans
+const DAYN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const pad2 = h => String(h).padStart(2, '0') + ':00';
+const winText = p => p.from == null ? 'All hours, every day'
+  : `${pad2(p.from)}–${pad2(p.to)}, ${p.days.length === 5 && p.days.join() === '0,1,2,3,4' ? 'Sun–Thu' : p.days.map(d => DAYN[d]).join(', ')}`;
+const fmtDur = s => s < 3600 ? Math.round(s / 60) + ' min' : s < 172800 ? (s / 3600).toFixed(1) + ' h' : (s / 86400).toFixed(1) + ' days';
+let plansAll = false;
+try { plansAll = localStorage.getItem('p1.plansAll') === '1'; } catch {}
+function renderPlans() {
+  const d = S.plans; if (!d) return;
+  $('#plans-more').textContent = plansAll ? 'Best plan per supplier' : 'Show all plans';
+  if (d.error) { $('#plans-sub').textContent = 'Could not load plans: ' + d.error; return; }
+  if (!d.covered_s) { $('#plans-sub').textContent = 'No usage logged yet. Plug the cable in and let it run.'; $('#plans').innerHTML = ''; return; }
+  $('#plans-sub').textContent = `Based on ${fmtDur(d.covered_s)} of logged use (${d.kwh.toFixed(1)} kWh, last 28 days), projected to a month.` +
+    (d.covered_s >= 86400 ? ` At your price that is about ${money(d.cost_per_month)} a month of energy.` : '');
+  const early = d.covered_s < 7 * 86400 || d.days_seen < 7;
+  $('#plans-notice').innerHTML = early ? `<div class="notice">Early estimate: needs at least a full week of logging, including Friday and Saturday, ` +
+    `before the ranking means much. ${d.days_seen} of 7 weekdays seen so far.</div>` : '';
+  let rows = d.plans;
+  if (!plansAll) { const seen = new Set(); rows = rows.filter(p => !seen.has(p.supplier) && seen.add(p.supplier)); }
+  const max = Math.max(...rows.map(p => p.per_month || 0), 0.01);
+  $('#plans').innerHTML = rows.map((p, i) => `<div class="prow" data-i="${d.plans.indexOf(p)}">
+      <div class="nm"><b>${p.supplier}</b> · ${p.name}${i === 0 ? '<span class="badge">Best so far</span>' : ''}
+        <div>${p.discount}% off · ${winText(p)}${p.condition ? ' · ' + p.condition : ''}</div></div>
+      <div class="track"><div class="bar" style="width:${(p.per_month || 0) / max * 100}%"></div></div>
+      <div class="val">${money(p.per_month)}<div>${p.share == null ? '' : Math.round(p.share * 100) + '% of use'}</div></div>
+    </div>`).join('');
+  $('#plans-foot').textContent = `Prices from ${d.source}. Discounts apply to the energy charge only; holidays are treated as normal days. ` +
+    'Plans cover your logged hours only, so Mac sleep or an unplugged cable leaves gaps. Edit plans.json to update offers.';
+  document.querySelectorAll('.prow').forEach(r => {
+    r.addEventListener('pointermove', e => {
+      const p = d.plans[+r.dataset.i];
+      showTip(e.clientX, e.clientY, `<b>${p.supplier} · ${p.name}</b>
+        <div class="row">Window<span class="v">${winText(p)}</span></div>
+        <div class="row">Your use in window<span class="v">${Math.round((p.share || 0) * 100)}%</span></div>
+        <div class="row">Effective discount<span class="v">${(p.effective || 0).toFixed(1)}%</span></div>
+        <div class="row">Saved in logged period<span class="v">${money(p.saved)}</span></div>
+        <div class="row">Per month<span class="v">${money(p.per_month)}</span></div>`);
+    });
+    r.addEventListener('pointerleave', hideTip);
+  });
+}
+async function loadPlans() {
+  try { S.plans = await (await fetch('/api/plans?days=28')).json(); } catch { return; }
+  renderPlans();
+}
+$('#plans-more').addEventListener('click', () => {
+  plansAll = !plansAll; try { localStorage.setItem('p1.plansAll', plansAll ? '1' : '0'); } catch {}
+  renderPlans();
+});
+
+new ResizeObserver(() => { renderPower(); renderHourly(); }).observe(document.querySelector('main'));
+
+(async () => {
+  try {
+    const d = await (await fetch('/api/recent')).json();
+    S.live = d.points;
+    if (d.latest) { S.last = d.latest; S.lastAt = d.latest.ts * 1000; renderHero(); }
+  } catch {}
+  await loadConfig();
+  setRange(S.range);
+  loadHourly();
+  loadPlans();
+  setInterval(loadPlans, 300000);
+  new EventSource('/api/stream').onmessage = e => onRec(JSON.parse(e.data));
+  setInterval(loadHourly, 60000);
+  setInterval(() => { if (S.range !== 600) loadHist(S.range); }, 30000);
+})();
+</script>
+</body>
+</html>

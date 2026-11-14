@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meter Details</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f3f0; --surface-1: #fcfcfb; --surface-2: #f0efec; --border: #e6e5e1;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #77766f;
+  --accent: #2a78d6; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #2c2c2a;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+    --accent: #3987e5; --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #2c2c2a;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+  --accent: #3987e5; --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text-primary);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 16px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 20px; font-weight: 600; margin: 0; }
+h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.lede { color: var(--text-secondary); margin: 0 0 12px; font-size: 13px; }
+nav { display: flex; gap: 4px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+nav a { color: var(--text-secondary); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
+nav a[aria-current="page"] { background: var(--bg); color: var(--text-primary); }
+.left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.status { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.status[data-s="live"] .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+.status[data-s="stale"] .dot { background: var(--warning); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.label { color: var(--text-secondary); font-size: 13px; }
+.tile .value { font-size: 22px; font-weight: 600; margin-top: 4px; overflow-wrap: anywhere; }
+.sub { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+td.k { color: var(--text-secondary); width: 38%; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+td code { color: var(--text-secondary); }
+pre { background: var(--surface-2); border-radius: 8px; padding: 12px; margin: 0; overflow-x: auto; line-height: 1.55; }
+.scroll { overflow-x: auto; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-secondary); }
+.pill.on { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--text-primary); }
+.note { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--surface-2); border-radius: 0 8px 8px 0; font-size: 13px; margin-top: 12px; }
+ul.plain { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; }
+ul.plain li { margin: 3px 0; }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+.bar { display: flex; gap: 2px; height: 10px; border-radius: 999px; overflow: hidden; margin: 8px 0 6px; }
+.bar i { display: block; height: 100%; }
+@media (max-width: 860px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile .value { font-size: 18px; }
+  td.k { width: 45%; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="left">
+      <h1>Meter details</h1>
+      <nav><a href="/">Dashboard</a><a href="/about" aria-current="page">About</a></nav>
+    </div>
+    <div class="status" id="status"><span class="dot"></span><span id="status-text">Connecting…</span></div>
+  </header>
+
+  <section class="tiles">
+    <div class="card tile"><div class="label">Meter</div><div class="value">Kaifa MA110M</div><div class="sub" id="g-id">P1 ID —</div></div>
+    <div class="card tile"><div class="label">Protocol</div><div class="value" id="g-proto">—</div><div class="sub" id="g-hdr">—</div></div>
+    <div class="card tile"><div class="label">Meter clock</div><div class="value" id="g-clock">—</div><div class="sub" id="g-drift">—</div></div>
+    <div class="card tile"><div class="label">Link</div><div class="value">115200 8N1</div><div class="sub" id="g-link">—</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Live registers</h2>
+    <p class="lede">Every field in the meter's latest P1 telegram, updated every 2 seconds.</p>
+    <div class="scroll"><table id="regs"><thead><tr><th>OBIS code</th><th>Meaning</th><th class="num">Value</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Last interval</h2>
+      <p class="lede">The meter's interval log (<code>1-0:99.1.0</code>). P1 only carries the most recent entry.</p>
+      <table><tbody id="interval"><tr><td class="k">Waiting…</td><td></td></tr></tbody></table>
+      <div class="note">The entry stamped 01:15 stayed unchanged from 01:15 to 01:25, so the interval is probably <b>15 minutes</b>. If this table shows a timestamp ending in :00, :15, :30 or :45, that confirms it.</div>
+    </div>
+    <div class="card">
+      <h2>Lifetime counters</h2>
+      <p class="lede">Total energy since the meter was installed, per counter. T1 is probably IEC peak and T3 off-peak; T2 is unused. On a flat-rate or supplier plan every counter costs the same.</p>
+      <div class="bar" id="t-bar"></div>
+      <table><tbody id="totals"></tbody></table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Raw telegram</h2>
+    <p class="lede" id="raw-meta">Exactly what the meter sends, once a second. Only telegrams that pass the CRC16 check are shown.</p>
+    <pre id="raw">Waiting for the meter…</pre>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Nameplate</h2>
+      <p class="lede">From the photo of the meter.</p>
+      <table><tbody>
+        <tr><td class="k">Manufacturer</td><td>Shenzhen Kaifa Technology (Chengdu) Co., Ltd.</td></tr>
+        <tr><td class="k">Model</td><td>MA110M <span class="pill">H23LCDE</span></td></tr>
+        <tr><td class="k">Barcode / serial</td><td><b>2557xxxx</b></td></tr>
+        <tr><td class="k">Comms module</td><td>2G + 3G + 4G module CL102K</td></tr>
+        <tr><td class="k">Type</td><td>Single phase, 2-wire (1P.2W)</td></tr>
+        <tr><td class="k">Current</td><td>0.25 A min · 5 A reference · 60 A max</td></tr>
+        <tr><td class="k">Supply</td><td>230 V, 50 Hz</td></tr>
+        <tr><td class="k">Accuracy</td><td>Class 1 (IEC 62053-21) · Class B (EN 50470-3)</td></tr>
+        <tr><td class="k">Standards</td><td>IEC 62052-11 · IEC 62053-21 · EN 50470-3</td></tr>
+        <tr><td class="k">Metrology mark</td><td>CE · M25 (2025) · notified body 0122 · T12100</td></tr>
+        <tr><td class="k">Test LED</td><td>2000 flashes per kWh (1 flash = 0.5 Wh)</td></tr>
+        <tr><td class="k">Protection</td><td>IP54 · −25 °C to +55 °C</td></tr>
+        <tr><td class="k">Made</td><td>2025, China</td></tr>
+        <tr><td class="k">Ports</td><td>P1 (RJ12, behind an unsealed flip cover) · optical IR port</td></tr>
+        <tr><td class="k">Display flags</td><td><code>L1 T3 RO OM OT RE Mag</code>, signal bars, energy direction, Status LED</td></tr>
+        <tr><td class="k">Seals</td><td>Comms-module screw, terminal cover, lower button (DT)</td></tr>
+      </tbody></table>
+      <div class="note">The barcode says <b>2557xxxx</b>, but the P1 ID is <b id="n-id">K06xxx</b>. Bills may use either.</div>
+    </div>
+    <div class="card">
+      <h2>Connection</h2>
+      <p class="lede">The cable and how this Mac sees it.</p>
+      <table><tbody>
+        <tr><td class="k">Cable</td><td>P1 cable with FTDI FT232RL</td></tr>
+        <tr><td class="k">USB IDs</td><td><code>0403:6001</code> · bcdDevice 0600</td></tr>
+        <tr><td class="k">USB serial</td><td><code>FTxxxxxx</code></td></tr>
+        <tr><td class="k">Driver</td><td>Apple built-in (DriverKit AppleUSBFTDI), nothing installed</td></tr>
+        <tr><td class="k">Device</td><td><code id="c-dev">—</code></td></tr>
+        <tr><td class="k">Serial settings</td><td>115200 baud, 8N1 · 9600 7E1 gives nothing</td></tr>
+        <tr><td class="k">Encryption</td><td>None, plain ASCII text</td></tr>
+        <tr><td class="k">Telegram</td><td><span id="c-size">—</span> bytes, every second, CRC16 (0xA001)</td></tr>
+        <tr><td class="k">Since server start</td><td id="c-count">—</td></tr>
+        <tr><td class="k">Server running for</td><td id="c-up">—</td></tr>
+      </tbody></table>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Logger</h2>
+      <p class="lede">What the dashboard has recorded so far (one row every 10 seconds).</p>
+      <table><tbody>
+        <tr><td class="k">Rows</td><td id="l-rows">—</td></tr>
+        <tr><td class="k">First reading</td><td id="l-first">—</td></tr>
+        <tr><td class="k">Latest row</td><td id="l-last">—</td></tr>
+        <tr><td class="k">Database</td><td id="l-db">—</td></tr>
+      </tbody></table>
+      <h2 style="margin-top:16px">Time on each counter</h2>
+      <div class="bar" id="share-bar"></div>
+      <table><tbody id="share"></tbody></table>
+      <h2 style="margin-top:16px">Counter switches seen</h2>
+      <table><tbody id="changes"><tr><td class="k">None yet. The schedule appears after a few days of logging.</td></tr></tbody></table>
+    </div>
+    <div class="card">
+      <h2>History: how far back</h2>
+      <p class="lede">P1 is send-only. You can't ask the meter for older data through it.</p>
+      <table><thead><tr><th>Source</th><th>Reaches back</th></tr></thead><tbody>
+        <tr><td>P1 live values</td><td>Now only</td></tr>
+        <tr><td>P1 lifetime counters</td><td>Since installation, as totals only</td></tr>
+        <tr><td>P1 interval log</td><td>One interval (≈ 15 min)</td></tr>
+        <tr><td>This logger</td><td id="h-logger">From first start, while running</td></tr>
+        <tr><td>Meter's internal memory</td><td>31 days daily, 12 months monthly, plus load profiles. Encrypted; IEC reads it over 4G</td></tr>
+        <tr><td>IEC personal area</td><td>Smart-meter readings, normally 15-minute. <b>Best source for past usage.</b></td></tr>
+      </tbody></table>
+      <h2 style="margin-top:16px">Not sent by this meter</h2>
+      <p class="lede">Fields a Dutch DSMR 5 meter includes but this one leaves out:</p>
+      <ul class="plain">
+        <li>Power-outage counters and outage log (<code>96.7.21</code>, <code>96.7.9</code>, <code>99.97.0</code>)</li>
+        <li>Voltage dip and spike counters (<code>32.32.0</code>, <code>32.36.0</code>)</li>
+        <li>Per-phase power (<code>21.7.0</code>, <code>22.7.0</code>)</li>
+        <li>Gas or water meter readings (<code>0-n:24.2.1</code>)</li>
+        <li>Text code (<code>96.13.1</code>). The text message field <code>96.13.0</code> is sent but empty.</li>
+      </ul>
+      <h2 style="margin-top:16px">Resolution</h2>
+      <ul class="plain">
+        <li>Energy counters: 1 Wh</li>
+        <li>Power: 10 W steps</li>
+        <li>Voltage: shown to 0.1 V, changes in whole volts</li>
+        <li>Current: 0.1 A</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<script>
+const TNAME = ['Peak (T1)', 'T2', 'Off-peak (T3)']; // inferred from IEC TOU schedule; unconfirmed
+
+const $ = s => document.querySelector(s);
+const TV = ['--series-1', '--series-2', '--series-3'];
+const OBIS = {
+  '1-3:0.2.8': 'P1 protocol version',
+  '0-0:1.0.0': 'Meter clock',
+  '0-0:96.1.1': 'Equipment ID',
+  '1-0:1.8.11': 'Imported energy, T1 (peak)',
+  '1-0:1.8.12': 'Imported energy, T2 (unused)',
+  '1-0:1.8.13': 'Imported energy, T3 (off-peak)',
+  '1-0:1.8.1': 'Imported energy, tariff 1',
+  '1-0:1.8.2': 'Imported energy, tariff 2',
+  '1-0:2.8.11': 'Exported energy, T1 (peak)',
+  '1-0:2.8.12': 'Exported energy, T2',
+  '1-0:2.8.13': 'Exported energy, T3 (off-peak)',
+  '1-0:2.8.1': 'Exported energy, tariff 1',
+  '1-0:2.8.2': 'Exported energy, tariff 2',
+  '0-0:96.14.1': 'Active counter (tariff)',
+  '0-0:96.14.0': 'Active tariff',
+  '1-0:1.7.0': 'Power imported now',
+  '1-0:2.7.0': 'Power exported now',
+  '0-0:96.13.0': 'Message from the utility',
+  '0-0:96.13.1': 'Message code',
+  '1-0:32.7.0': 'Voltage, L1',
+  '1-0:31.7.0': 'Current, L1',
+  '1-0:52.7.0': 'Voltage, L2',
+  '1-0:51.7.0': 'Current, L2',
+  '1-0:72.7.0': 'Voltage, L3',
+  '1-0:71.7.0': 'Current, L3',
+  '1-0:21.7.0': 'Power imported, L1',
+  '1-0:22.7.0': 'Power exported, L1',
+  '1-0:41.7.0': 'Power imported, L2',
+  '1-0:42.7.0': 'Power exported, L2',
+  '1-0:61.7.0': 'Power imported, L3',
+  '1-0:62.7.0': 'Power exported, L3',
+  '1-0:99.1.0': 'Interval log (last entry)',
+  '0-0:96.7.21': 'Power failures',
+  '0-0:96.7.9': 'Long power failures',
+};
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const meterDate = s => {
+  const m = /^(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)([WS])$/.exec(s || '');
+  return m ? new Date(2000 + +m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+};
+const fmtDT = d => d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' });
+const fmtDur = s => { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? `${h} h ${m} min` : m ? `${m} min ${s % 60} s` : `${s} s`; };
+const n = x => Number(x).toLocaleString();
+
+function parseTelegram(raw) {
+  const lines = raw.split(/\r?\n/), out = [];
+  for (const l of lines) {
+    const m = /^(\d+-\d+:\d+\.\d+\.\d+)((?:\([^)]*\))+)\s*$/.exec(l.trim());
+    if (m) out.push({ code: m[1], vals: [...m[2].matchAll(/\(([^)]*)\)/g)].map(x => x[1]) });
+  }
+  return { header: lines[0] || '', fields: out, crc: (/!([0-9A-F]{4})/.exec(raw) || [])[1] };
+}
+function fmtVal(f) {
+  const v = f.vals[0] ?? '';
+  if (f.code === '1-0:99.1.0') return `${f.vals[0]} entry`;
+  if (f.code === '0-0:1.0.0') { const d = meterDate(v); return d ? `${fmtDT(d)} <span class="pill">${v.endsWith('S') ? 'summer' : 'winter'}</span>` : esc(v); }
+  if (f.code === '1-3:0.2.8') return `${esc(v)} <span class="pill">v${v[0]}.${v.slice(1)}</span>`;
+  if (f.code === '0-0:96.14.1' || f.code === '0-0:96.14.0') return TNAME[+v - 1] || `T${+v}`;
+  if (v === '') return '<span style="color:var(--text-muted)">empty</span>';
+  const [num, unit] = v.split('*');
+  if (unit && !isNaN(+num)) return `${(+num).toLocaleString(undefined, { maximumFractionDigits: 3, minimumFractionDigits: unit === 'kWh' ? 3 : 0 })} ${esc(unit)}`;
+  return esc(v);
+}
+
+let lastRawTs = 0;
+async function tick() {
+  let d;
+  try { d = await (await fetch('/api/meta')).json(); } catch { return; }
+  const st = $('#status'), txt = $('#status-text');
+  const age = d.raw_ts ? d.now - d.raw_ts : Infinity;
+  if (!d.raw) { st.dataset.s = ''; txt.textContent = 'Waiting for the meter…'; }
+  else if (age < 5) { st.dataset.s = 'live'; txt.textContent = 'Live'; }
+  else { st.dataset.s = 'stale'; txt.textContent = `No data for ${Math.round(age)} s. Check the cable.`; }
+
+  $('#c-dev').textContent = d.device || 'not found';
+  $('#c-count').textContent = `${n(d.ok)} valid telegrams · ${n(d.bad)} CRC failures`;
+  $('#c-up').textContent = fmtDur(d.now - d.started);
+  $('#g-link').textContent = `${n(d.ok)} ok · ${n(d.bad)} bad`;
+  renderLogger(d.db);
+  if (!d.raw || d.raw_ts === lastRawTs) return;
+  lastRawTs = d.raw_ts;
+
+  const t = parseTelegram(d.raw), F = Object.fromEntries(t.fields.map(f => [f.code, f]));
+  $('#raw').textContent = d.raw;
+  $('#raw-meta').textContent = `Received ${fmtDT(new Date(d.raw_ts * 1000))} · ${d.raw.length} bytes · CRC ${t.crc} verified. Only telegrams that pass the CRC16 check are shown.`;
+  $('#c-size').textContent = d.raw.length;
+
+  const id = F['0-0:96.1.1']?.vals[0] || '—';
+  $('#g-id').textContent = `P1 ID ${id} · barcode 2557xxxx`; $('#n-id').textContent = id;
+  const ver = F['1-3:0.2.8']?.vals[0];
+  $('#g-proto').textContent = ver ? `DSMR ${ver[0]}.${ver.slice(1)}` : '—';
+  $('#g-hdr').textContent = t.header;
+  const md = meterDate(F['0-0:1.0.0']?.vals[0]);
+  if (md) {
+    $('#g-clock').textContent = md.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const drift = d.raw_ts - md.getTime() / 1000;
+    $('#g-drift').textContent = Math.abs(drift) < 1.5 ? 'In sync with this Mac' : `${drift > 0 ? 'Behind' : 'Ahead of'} this Mac by ${Math.abs(drift).toFixed(0)} s`;
+  }
+
+  $('#regs tbody').innerHTML = t.fields.map(f =>
+    `<tr><td><code>${f.code}</code></td><td>${OBIS[f.code] || '<span style="color:var(--text-muted)">Unknown field</span>'}</td><td class="num">${fmtVal(f)}</td></tr>`).join('');
+
+  const iv = F['1-0:99.1.0'];
+  if (iv) {
+    const count = +iv.vals[0], cols = iv.vals.slice(2, 4), rest = iv.vals.slice(4);
+    const rows = [];
+    for (let i = 0; i < count && rest.length >= 4; i++) {
+      const [ts, status, a, b] = rest.splice(0, 4);
+      const end = meterDate(ts);
+      rows.push(`<tr><td class="k">Interval ending</td><td>${end ? fmtDT(end) : esc(ts)}</td></tr>
+        <tr><td class="k">Imported in interval</td><td>${fmtVal({ vals: [a] })} <span class="pill">${esc(cols[0] || '')}</span></td></tr>
+        <tr><td class="k">Exported in interval</td><td>${fmtVal({ vals: [b] })} <span class="pill">${esc(cols[1] || '')}</span></td></tr>
+        <tr><td class="k">Status</td><td>${esc(status)} ${status === '00' ? '<span class="pill on">OK</span>' : ''}</td></tr>`);
+    }
+    rows.push(`<tr><td class="k">Entries carried</td><td>${count} · log ID <code>${esc(iv.vals[1] || '')}</code></td></tr>`);
+    $('#interval').innerHTML = rows.join('');
+  }
+
+  const tariffs = [11, 12, 13].map(k => ({ imp: parseFloat(F[`1-0:1.8.${k}`]?.vals[0]) || 0, exp: parseFloat(F[`1-0:2.8.${k}`]?.vals[0]) || 0 }));
+  const tot = tariffs.reduce((s, x) => s + x.imp, 0), active = +(F['0-0:96.14.1']?.vals[0] || 0);
+  $('#t-bar').innerHTML = tariffs.map((x, i) => x.imp > 0 ? `<i style="width:${x.imp / tot * 100}%;background:var(${TV[i]})"></i>` : '').join('');
+  $('#totals').innerHTML = tariffs.map((x, i) => `<tr><td class="k"><i class="sw" style="background:var(${TV[i]})"></i>${TNAME[i]}${active === i + 1 ? ' <span class="pill on">active</span>' : ''}</td>
+      <td class="num">${x.imp.toLocaleString(undefined, { minimumFractionDigits: 3 })} kWh</td><td class="num">${tot ? (x.imp / tot * 100).toFixed(1) : 0}%</td></tr>`).join('') +
+    `<tr><td class="k"><b>Total imported</b></td><td class="num"><b>${tot.toLocaleString(undefined, { minimumFractionDigits: 3 })} kWh</b></td><td></td></tr>
+     <tr><td class="k">Total exported</td><td class="num">${tariffs.reduce((s, x) => s + x.exp, 0).toLocaleString(undefined, { minimumFractionDigits: 3 })} kWh</td><td></td></tr>`;
+}
+
+function renderLogger(db) {
+  if (!db) return;
+  $('#l-rows').textContent = n(db.rows);
+  $('#l-first').textContent = db.first ? fmtDT(new Date(db.first * 1000)) : '—';
+  $('#l-last').textContent = db.last ? fmtDT(new Date(db.last * 1000)) : '—';
+  $('#l-db').innerHTML = `${(db.bytes / 1024).toFixed(0)} KB · <code>data/p1.sqlite</code>`;
+  if (db.first) $('#h-logger').textContent = `From ${fmtDT(new Date(db.first * 1000))}, while running`;
+  const share = db.tariff_rows || {}, total = Object.values(share).reduce((a, b) => a + b, 0);
+  const keys = Object.keys(share).filter(k => k !== 'null').sort();
+  $('#share-bar').innerHTML = keys.map(k => `<i style="width:${share[k] / total * 100}%;background:var(${TV[k - 1] || '--text-muted'})"></i>`).join('');
+  $('#share').innerHTML = keys.map(k => `<tr><td class="k"><i class="sw" style="background:var(${TV[k - 1] || '--text-muted'})"></i>${TNAME[k - 1] || 'T' + k}</td>
+    <td class="num">${fmtDur(share[k] * 10)}</td><td class="num">${(share[k] / total * 100).toFixed(1)}%</td></tr>`).join('') ||
+    '<tr><td class="k">No rows yet</td></tr>';
+  if (db.tariff_changes?.length) $('#changes').innerHTML = db.tariff_changes.map(c =>
+    `<tr><td class="k">${fmtDT(new Date(c.ts * 1000))}</td><td>${TNAME[c.from - 1] || 'T' + c.from} → ${TNAME[c.to - 1] || 'T' + c.to}</td></tr>`).join('');
+}
+
+tick(); setInterval(tick, 2000);
+</script>
+</body>
+</html>

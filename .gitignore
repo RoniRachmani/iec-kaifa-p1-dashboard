@@ -1,0 +1,11 @@
+# Personal data: never commit
+# SQLite log of household electricity use
+data/
+# Saved prices
+config.json
+*.log
+
+# Python / macOS
+__pycache__/
+*.pyc
+.DS_Store
