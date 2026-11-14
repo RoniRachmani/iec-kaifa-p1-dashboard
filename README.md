@@ -9,6 +9,14 @@ A local, live electricity dashboard for Israel Electric Corporation (IEC) **Kaif
 
 <sub>Screenshot with demo data.</sub>
 
+<details>
+<summary><b>See it running</b> (animated, 2.7 MB)</summary>
+
+![Animated demo: a boiler switches on live, the power chart switches between 1 hour, 24 hours and 7 days with hover details, the supplier plan comparison, then the meter details page with the raw telegram](docs/dashboard-demo.gif)
+
+<sub>Demo data and a simulated meter.</sub>
+</details>
+
 - Live power, voltage and current, updated every second
 - Today's kWh, cost and peak
 - Power chart (10 min / 1 h / 24 h / 7 d)
@@ -149,7 +157,7 @@ Bad parameters return `400`.
 | `tests/` | Unit tests (stdlib `unittest`) and a masked sample telegram |
 | [`METER.md`](METER.md) | Everything known about the meter, the P1 port, IEC tariffs and official documentation |
 | [`ESP32-READER.md`](ESP32-READER.md) | Parts, wiring and plan for a standalone ESP32 P1 reader |
-| `docs/` | README screenshots (demo data) |
+| `docs/` | README screenshots and animated demo (demo data) |
 | `reference/` | Datasheets, standards, certificates, tariffs, and a redacted meter photo |
 | `data/`, `config.json` | Your usage log and prices. Created at runtime and **git-ignored** |
 
