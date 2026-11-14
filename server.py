@@ -314,7 +314,9 @@ class Store:
     def stats(self):
         """Logger summary. Reads only the small summary tables and the primary-key ends."""
         con = self.connect()
-        first, last = con.execute("SELECT MIN(ts), MAX(ts) FROM readings").fetchone()
+        # Two separate queries: SQLite only uses the index for a lone MIN() or MAX().
+        first = con.execute("SELECT MIN(ts) FROM readings").fetchone()[0]
+        last = con.execute("SELECT MAX(ts) FROM readings").fetchone()[0]
         rows, t1, t2, t3 = con.execute(
             "SELECT COALESCE(SUM(n), 0), SUM(t1), SUM(t2), SUM(t3) FROM hours").fetchone()
         changes = con.execute(
