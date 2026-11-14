@@ -316,6 +316,23 @@ class Summary(unittest.TestCase):
         self.assertAlmostEqual(h[3][2], 1.0, places=2)
         self.assertAlmostEqual(sum(x[2] for x in h if x), 23.0, places=2)
 
+    def test_plans_on_the_25_hour_day(self):
+        from datetime import date, datetime, time as dtime
+        day = date(2026, 10, 25)                         # Sunday; clocks go back at 02:00
+        st = self.raw_day(day)
+        end = datetime.combine(date(2026, 10, 26), dtime()).timestamp()
+        with mock.patch.object(server.time, "time", return_value=end):
+            r = st.plans([0.5, 0.5, 0.5], 1.05)
+        st.close()
+        share = {(p["supplier"].split()[0], p["name"]): p["share"] for p in r["plans"]}
+        self.assertAlmostEqual(r["kwh"], 25.0, places=2)                       # 25 real hours
+        self.assertAlmostEqual(share[("Super", "Fixed")], 1.0, places=6)
+        self.assertAlmostEqual(share[("Super", "Day")], 10 / 25, places=3)     # 07-17
+        self.assertAlmostEqual(share[("Cellcom", "Afternoon / evening")], 6 / 25, places=3)  # 14-20
+        # Night windows start Sun-Thu at 23:00. Sunday 00-07 belongs to Saturday night (no discount),
+        # including the repeated 01:00 hour, so only Sunday 23:00-24:00 counts.
+        self.assertAlmostEqual(share[("Super", "Night Plus")], 1 / 25, places=3)
+
     def test_missing_counter_is_skipped_not_a_spike(self):
         st = Store(self.path)
         t0 = 1_800_000_000
