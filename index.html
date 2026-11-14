@@ -152,6 +152,8 @@ th { color: var(--text-secondary); font-weight: 500; }
     </div>
   </header>
 
+  <div class="notice" id="meter-notice" role="status" hidden></div>
+
   <section class="card panel" id="rate-panel" hidden>
     <h2>Electricity price</h2>
     <div class="hint">Price per kWh including VAT. The meter counts energy on three counters: T1 (probably IEC peak), T2 (unused) and T3 (probably off-peak).
@@ -422,11 +424,23 @@ function renderHero() {
   $('#cost-hour').textContent = exporting ? '—' : money((r.p_in || 0) / 1000 * price);
   $('#cost-hour-sub').textContent = `per hour · ${S.cfg.currency}${price}/kWh, ${planLabel()}${flatPrice() == null ? `, now ${tName(r.tariff)}` : ''}${S.cfg.estimated ? ' (estimated price)' : ''}`;
 }
+function renderMeter(r) {
+  // A log belongs to one meter. Another meter is shown live but not saved, and the
+  // tiles that compare it with the log are blanked, since its counters are unrelated.
+  const el = $('#meter-notice'), other = r.logging === false;
+  const file = `data/${String(r.meter_id).replace(/[^A-Za-z0-9_-]/g, '_')}.sqlite`;
+  el.hidden = !other;
+  if (other) el.textContent = r.log_meter
+    ? `This is meter ${r.meter_id}, but this log belongs to meter ${r.log_meter}. Showing it live without saving it. To log it, restart the server with its own file: --db ${file}`
+    : `Meter ${r.meter_id}'s counters don't carry on from this log, so it may be a different meter. Showing it live without saving it. Start with --db ${file} to log it separately, or --adopt-meter if it is the same home.`;
+  for (const k of ['today', 'cost', 'peak']) if (other) { $(`#t-${k}`).textContent = '—'; $(`#t-${k}-sub`).textContent = 'Not logged for this meter'; }
+}
 function renderTiles() {
   const r = S.last, d = S.hourly;
   if (r) {
     $('#t-total').innerHTML = `${fmtKwh(r.imp_total)}<small>kWh</small>`;
     $('#t-total-sub').textContent = r.exp_total > 0 ? `${fmtKwh(r.exp_total)} kWh exported` : 'Imported from the grid';
+    if (r.logging === false) return renderMeter(r);
   }
   if (r && d && d.first) {
     $('#t-today').innerHTML = `${fmtKwh(Math.max(0, r.imp_total - d.first.total))}<small>kWh</small>`;
@@ -460,7 +474,7 @@ function onRec(r) {
   S.last = r; S.lastAt = Date.now();
   S.live.push([r.ts, r.p_in]);
   const cut = r.ts - 900; while (S.live.length && S.live[0][0] < cut) S.live.shift();
-  renderHero(); renderTiles();
+  renderMeter(r); renderHero(); renderTiles();
   if (S.range === 600) renderPower();
 }
 function setRange(R) {

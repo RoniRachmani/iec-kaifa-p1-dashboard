@@ -178,6 +178,11 @@ class ReaderRobustness(unittest.TestCase):
 
     def test_unexpected_error_is_counted_and_reading_continues(self):
         class Broken:
+            meter_id = None
+
+            def check_meter(self, rec):
+                return True
+
             def add(self, rec):
                 raise RuntimeError("boom")
         hub = Hub()
@@ -191,6 +196,105 @@ class ReaderRobustness(unittest.TestCase):
         hub = Hub()
         handle_telegram(TELEGRAM[:-4] + b"0000", hub, None)
         self.assertEqual((hub.ok, hub.bad, hub.errors), (0, 1, 0))
+
+
+def meter_telegram(mid, regs=(1.0, 0.0, 2.0), p_kw=0.5):
+    lines = [b"0-0:96.1.1(" + mid.encode() + b")"] if mid else []
+    lines += [b"1-0:1.8.1%d(%010.3f*kWh)" % (k, v) for k, v in zip((1, 2, 3), regs)]
+    lines += [b"1-0:1.7.0(%06.3f*kW)" % p_kw]
+    return telegram(lines)
+
+
+class MeterIdentity(unittest.TestCase):
+    """A log belongs to one meter: another meter's readings are shown live but never logged."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.tmp.name, "p1.sqlite")
+        self.clock = 1_800_000_000.0
+        patcher = mock.patch.object(server.time, "time", side_effect=lambda: self.clock)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self.tmp.cleanup)
+
+    def feed(self, st, hub, mid, regs, step=10):
+        self.clock += step
+        handle_telegram(meter_telegram(mid, regs), hub, st)
+        return hub.latest
+
+    def rows(self, st):
+        return query(st, "SELECT count(*) FROM readings")[0][0]
+
+    def test_meter_id_parsing(self):
+        self.assertEqual(parse(TELEGRAM)["meter_id"], "K06xxx")
+        self.assertEqual(server.meter_id("4530303339303031"), "E0039001")  # Dutch hex style
+        self.assertEqual(server.meter_id("K06123"), "K06123")
+        self.assertEqual(server.meter_id("12345678"), "12345678")  # hex digits, but not printable text
+        self.assertIsNone(server.meter_id(""))
+        self.assertIsNone(parse(meter_telegram(None))["meter_id"])
+
+    def test_empty_log_is_claimed_and_survives_restart(self):
+        hub, st = Hub(), Store(self.path)
+        r = self.feed(st, hub, "K06AAA", (1, 0, 2))
+        self.assertTrue(r["logging"])
+        self.assertEqual(r["log_meter"], "K06AAA")
+        st.close()
+        self.assertEqual(Store(self.path).meter_id, "K06AAA")
+
+    def test_other_meter_is_live_but_not_logged(self):
+        hub, st = Hub(), Store(self.path)
+        self.feed(st, hub, "K06AAA", (1, 0, 2))
+        r = self.feed(st, hub, "K06BBB", (500, 0, 900))
+        self.assertFalse(r["logging"])
+        self.assertEqual(r["log_meter"], "K06AAA")
+        self.assertIs(hub.latest, r)                  # still published for the live view
+        self.assertEqual(self.rows(st), 1)
+        self.assertEqual(st.stats()["foreign"], "K06BBB")
+        r = self.feed(st, hub, "K06AAA", (1.001, 0, 2))  # the right meter again
+        self.assertTrue(r["logging"])
+        self.assertIsNone(st.stats()["foreign"])
+        self.assertEqual(self.rows(st), 2)
+        st.close()
+
+    def test_old_log_is_adopted_when_counters_carry_on(self):
+        st = Store(self.path)
+        st.add(rec(self.clock, [1.0, 0.0, 2.0]))     # a log from before IDs were recorded
+        st.close()
+        hub, st = Hub(), Store(self.path)
+        self.clock += 3600
+        r = self.feed(st, hub, "K06AAA", (1.5, 0, 2.5), step=0)  # +1 kWh in an hour
+        self.assertTrue(r["logging"])
+        self.assertEqual(st.meter_id, "K06AAA")
+        st.close()
+
+    def test_old_log_refuses_a_meter_whose_counters_dont_fit(self):
+        st = Store(self.path)
+        st.add(rec(self.clock, [1.0, 0.0, 2.0]))
+        st.close()
+        hub, st = Hub(), Store(self.path)
+        lower = self.feed(st, hub, "K06BBB", (0.5, 0, 2))         # a counter went down
+        jump = self.feed(st, hub, "K06CCC", (900, 0, 2))          # 899 kWh in 10 s
+        self.assertFalse(lower["logging"] or jump["logging"])
+        self.assertIsNone(st.meter_id)
+        self.assertEqual(self.rows(st), 1)
+        st.close()
+
+    def test_adopt_meter_rebinds_the_log(self):
+        hub, st = Hub(), Store(self.path)
+        self.feed(st, hub, "K06AAA", (1, 0, 2))
+        st.close()
+        hub, st = Hub(), Store(self.path, adopt=True)  # e.g. IEC replaced the meter
+        r = self.feed(st, hub, "K06NEW", (0, 0, 0))
+        self.assertTrue(r["logging"])
+        self.assertEqual(st.meter_id, "K06NEW")
+        self.assertFalse(self.feed(st, hub, "K06AAA", (1, 0, 2))["logging"])  # only once
+        st.close()
+
+    def test_meter_without_id_is_logged(self):
+        hub, st = Hub(), Store(self.path)
+        self.assertTrue(self.feed(st, hub, None, (1, 0, 2))["logging"])
+        self.assertIsNone(st.meter_id)
+        st.close()
 
 
 class Http(unittest.TestCase):

@@ -65,8 +65,19 @@ The server finds the cable automatically: `/dev/cu.usbserial*` on macOS, and `/d
 | `--allow-host` | — | Extra name the dashboard may be opened as, e.g. a DNS name for a Raspberry Pi. IP addresses, `localhost` and this computer's name are always allowed. Repeatable |
 | `--http` | `8765` | Web port |
 | `--db` | `data/p1.sqlite` | SQLite log, one row per 10 s |
+| `--adopt-meter` | — | Give the log to the next meter seen, e.g. after IEC replaces yours. See [One log per meter](#one-log-per-meter) |
 
 Unplugging the cable is fine: the server keeps serving and resumes within about 2 s of the cable returning.
+
+### One log per meter
+
+Each log belongs to one meter, identified by the equipment ID it sends (`0-0:96.1.1`). The first meter the server sees claims an empty log. If you plug the cable into a different meter, say in another flat, the dashboard still shows it live but saves nothing, and a banner says which meter the log belongs to. To log the other meter, give it its own file:
+
+```bash
+python3 server.py --db data/other-flat.sqlite
+```
+
+A log from before this check existed is claimed by the first meter whose counters carry on from its last row. If IEC replaces your meter, start once with `--adopt-meter` to move the log over to the new one.
 
 **Linux:** your user needs access to the serial device. Run `sudo usermod -aG dialout $USER`, then log out and back in. The server logs a hint if it gets "permission denied".
 
@@ -140,7 +151,7 @@ To report a vulnerability, use GitHub's [private vulnerability reporting](https:
 | `GET /api/history?seconds=N` | Bucketed average and peak power, for 10 min to 31 days |
 | `GET /api/hourly?date=YYYY-MM-DD` | kWh per local hour per tariff counter (23- and 25-hour days handled) |
 | `GET /api/plans?days=N` | Supplier plan savings projected from logged usage, for 1–366 days |
-| `GET /api/meta` | Raw telegram, age of the last reading, link and error counts, logger stats |
+| `GET /api/meta` | Raw telegram, age of the last reading, link and error counts, logger stats (including the log's meter ID and any other meter connected) |
 | `GET` / `POST /api/config` | Prices and currency. `POST` needs `Content-Type: application/json` |
 
 Bad parameters return `400`.

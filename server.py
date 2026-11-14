@@ -64,6 +64,22 @@ def crc16(data: bytes) -> int:
     return crc
 
 
+def meter_id(raw):
+    """The equipment ID (0-0:96.1.1) as text. Kaifa sends plain ASCII (K06...); Dutch meters
+    send the same text hex-encoded (4530...), which is decoded here."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    if len(raw) >= 8 and len(raw) % 2 == 0 and all(c in "0123456789abcdefABCDEF" for c in raw):
+        try:
+            text = bytes.fromhex(raw).decode("ascii")
+            if text.isprintable() and text.strip():
+                return text.strip()
+        except (ValueError, UnicodeDecodeError):
+            pass
+    return raw
+
+
 def parse(tele: bytes):
     """tele = b'/...!' + 4 hex CRC chars. Returns a dict or None if invalid."""
     body, crc = tele[:-4], tele[-4:]
@@ -106,6 +122,7 @@ def parse(tele: bytes):
     return {
         "ts": time.time(),
         "meter_time": (fields.get("0-0:1.0.0") or [None])[0],
+        "meter_id": meter_id((fields.get("0-0:96.1.1") or [None])[0]),
         "p_in": None if p_in is None else round(p_in * 1000, 1),
         "p_out": None if p_out is None else round(p_out * 1000, 1),
         "v": f("1-0:32.7.0"),   # L1, kept for the logger and single-phase display
@@ -167,6 +184,8 @@ CREATE TABLE IF NOT EXISTS hours (
 );
 CREATE INDEX IF NOT EXISTS hours_day ON hours(day);
 CREATE TABLE IF NOT EXISTS tariff_changes (ts REAL PRIMARY KEY, prev INTEGER, tariff INTEGER);
+-- Small settings, such as meter_id: the equipment ID this log belongs to.
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
 UPSERT_HOUR = """
@@ -182,6 +201,9 @@ ON CONFLICT(hour_ts) DO UPDATE SET
                THEN excluded.p_max ELSE p_max END
 """
 MAX_KW = 100  # an interval implying more than this is a glitch, not usage
+# A log from before meter IDs were recorded is claimed by the first meter whose counters carry
+# on from its last row: none lower, and no more than this average load across the gap.
+ADOPT_KW = 25
 
 
 def local_hour(ts):
@@ -208,14 +230,20 @@ def interval(prev, cur):
 
 
 class Store:
-    def __init__(self, path):
+    def __init__(self, path, adopt=False):
+        """adopt=True: give this log to the next meter seen, even one that doesn't match."""
         self.path = path
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         con = self.connect()
         con.executescript(SCHEMA)
         empty = con.execute("SELECT 1 FROM hours LIMIT 1").fetchone() is None
         has_rows = con.execute("SELECT 1 FROM readings LIMIT 1").fetchone() is not None
+        row = con.execute("SELECT value FROM meta WHERE key = 'meter_id'").fetchone()
         con.close()
+        self.meter_id = row[0] if row else None
+        self.adopt = adopt
+        self.foreign = None    # ID of a connected meter this log doesn't belong to
+        self._warned = set()
         if empty and has_rows:
             print("building the hourly summary from the log (one-time)…", flush=True)
             self.rebuild_summary()
@@ -281,7 +309,50 @@ class Store:
         con.execute("PRAGMA journal_mode=WAL")
         return con
 
+    def _claim(self, mid):
+        con = self.connect()
+        con.execute("INSERT OR REPLACE INTO meta VALUES ('meter_id', ?)", (mid,))
+        con.commit()
+        con.close()
+        self.meter_id, self.adopt = mid, False
+        print(f"log {self.path} belongs to meter {mid}", flush=True)
+
+    def _continues(self, r):
+        """Do this reading's counters carry on from the last logged row?"""
+        if self.prev is None:
+            return True
+        last, now = self.prev[1], r["imp"]
+        if any(v is None for v in last) or any(v is None for v in now):
+            return False
+        d = [b - a for a, b in zip(last, now)]
+        hours = max(r["ts"] - self.prev[0], 0) / 3600
+        return min(d) >= 0 and sum(d) <= ADOPT_KW * hours + 0.01
+
+    def check_meter(self, r):
+        """Should this reading go into this log? A log belongs to one meter, so a different
+        meter's counters never get mixed into its history. Called from the reader thread."""
+        mid = r.get("meter_id")
+        if mid is None or mid == self.meter_id:   # no ID sent: nothing to compare
+            self.foreign = None
+            return True
+        if self.adopt or (self.meter_id is None and self._continues(r)):
+            self._claim(mid)
+            self.foreign = None
+            return True
+        self.foreign = mid
+        if mid not in self._warned:
+            self._warned.add(mid)
+            why = (f"belongs to meter {self.meter_id}" if self.meter_id else
+                   "has readings whose counters don't match this meter's")
+            print(f"meter {mid} is connected, but {self.path} {why}. Showing it live without "
+                  f"logging. To log it, start with --db pointing at another file, "
+                  f"e.g. --db data/{re.sub(r'[^A-Za-z0-9_-]', '_', mid)}.sqlite", flush=True)
+        return False
+
     def add(self, r):  # called from the reader thread only
+        if not r.get("logging", True):
+            self.window = []
+            return
         if r["p_in"] is not None:
             self.window.append(r["p_in"])
         if not hasattr(self, "_last"):
@@ -348,6 +419,8 @@ class Store:
         size = sum(os.path.getsize(p) for p in (self.path, self.path + "-wal") if os.path.exists(p))
         return {
             "rows": rows, "first": first, "last": last, "bytes": size, "path": self.path,
+            "file": os.path.relpath(self.path, HERE) if self.path.startswith(HERE + os.sep) else self.path,
+            "meter_id": self.meter_id, "foreign": self.foreign,
             "tariff_changes": [{"ts": t, "from": a, "to": b} for t, a, b in changes],
             "tariff_secs": {str(k): v for k, v in ((1, t1), (2, t2), (3, t3)) if v},
         }
@@ -463,7 +536,11 @@ def handle_telegram(tele, hub, store):
             return
         hub.ok += 1
         hub.raw, hub.raw_ts = tele.decode("ascii", "replace"), rec["ts"]
-        hub.publish(rec)
+        try:
+            rec["logging"] = store.check_meter(rec)
+            rec["log_meter"] = store.meter_id
+        finally:
+            hub.publish(rec)  # the live view gets the reading even if the check fails
         store.add(rec)
     except Exception as err:  # noqa: BLE001 - logged and counted, reading continues
         hub.errors += 1
@@ -711,9 +788,12 @@ def main():
     ap.add_argument("--allow-host", action="append", default=[], metavar="NAME",
                     help="extra host name the dashboard may be opened as (IP addresses, localhost "
                          "and this computer's name are always allowed); repeatable")
+    ap.add_argument("--adopt-meter", action="store_true",
+                    help="give the log to the next meter seen, even if it belongs to another meter, e.g. after "
+                         "IEC replaces yours (normally a log keeps the meter it first saw and ignores others)")
     args = ap.parse_args()
 
-    hub, store = Hub(), Store(args.db)
+    hub, store = Hub(), Store(args.db, adopt=args.adopt_meter)
     threading.Thread(target=reader_supervisor, args=(args.port, hub, store), daemon=True).start()
     srv = ThreadingHTTPServer((args.host, args.http), make_handler(hub, store, Config(os.path.join(HERE, "config.json")), args.allow_host))
     srv.daemon_threads = True
