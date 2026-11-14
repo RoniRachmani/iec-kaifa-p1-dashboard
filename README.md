@@ -2,6 +2,13 @@
 
 A local, live electricity dashboard for Israel Electric Corporation (IEC) **Kaifa** smart meters, read through the **P1 port** (DSMR 5.0) with a USB cable.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/dashboard-dark.png">
+  <img src="docs/dashboard-light.png" alt="Dashboard: live power, today's kWh and cost, peak, meter total, a 24-hour power chart with boiler runs, and energy by hour" width="800">
+</picture>
+
+<sub>Screenshot with demo data.</sub>
+
 - Live power, voltage and current, updated every second
 - Today's kWh, cost and peak
 - Power chart (10 min / 1 h / 24 h / 7 d)
@@ -142,6 +149,7 @@ Bad parameters return `400`.
 | `tests/` | Unit tests (stdlib `unittest`) and a masked sample telegram |
 | [`METER.md`](METER.md) | Everything known about the meter, the P1 port, IEC tariffs and official documentation |
 | [`ESP32-READER.md`](ESP32-READER.md) | Parts, wiring and plan for a standalone ESP32 P1 reader |
+| `docs/` | README screenshots (demo data) |
 | `reference/` | Datasheets, standards, certificates, tariffs, and a redacted meter photo |
 | `data/`, `config.json` | Your usage log and prices. Created at runtime and **git-ignored** |
 
