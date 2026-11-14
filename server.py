@@ -252,8 +252,10 @@ class Store:
         local hours covering [since, until]. Call it after writing readings out of order (e.g. an
         ESP32 backfill): Store.add only folds in readings newer than the last one.
         Streams the rows, so memory stays flat on a large log."""
-        lo = -math.inf if since is None else local_hour(since)[0]
-        hi = math.inf if until is None else local_hour(until)[0] + 3600  # local hours are 3600 s
+        # Widen by one MAX_GAP each side: the interval joining the range to its neighbour can
+        # have its midpoint in the hour before (or after) the range.
+        lo = -math.inf if since is None else local_hour(since - MAX_GAP)[0]
+        hi = math.inf if until is None else local_hour(until + MAX_GAP)[0] + 3600  # local hours are 3600 s
         con = self.connect()
         con.execute("DELETE FROM hours WHERE hour_ts >= ? AND hour_ts < ?", (lo, hi))
         con.execute("DELETE FROM tariff_changes WHERE ts >= ? AND ts < ?", (lo, hi))

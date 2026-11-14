@@ -393,6 +393,29 @@ class Summary(unittest.TestCase):
         self.assertEqual([(c["from"], c["to"]) for c in st.stats()["tariff_changes"]], [(3, 1)])
         st.close()
 
+    def test_backfill_edges_next_to_an_hour_boundary(self):
+        from datetime import datetime
+        st = Store(self.path)
+        top = datetime(2026, 11, 2, 10, 0).timestamp()   # 10:00 local
+        load = lambda t: (t - top + 7200) / 3600         # 1 kW
+        # Live log up to 09:59:50, then from 11:00:10. The gap is backfilled 10:00:05-10:59:55, so the
+        # intervals joining it to the live log have midpoints at 09:59:57.5 and 11:00:02.5: in the hours
+        # just outside the backfilled range.
+        live = [top - 3600 + k * 10 for k in range(360)] + [top + 3610 + k * 10 for k in range(60)]
+        for t in live:
+            st.add(rec(t, [0.0, 0.0, load(t)]))
+        con = st.connect()
+        backfill = [top + 5 + k * 10 for k in range(360)]
+        con.executemany("INSERT INTO readings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        [(t, 1000.0, 1000.0, 0, 230, 4, 0.0, 0.0, load(t), 0, 0, 0, 3) for t in backfill])
+        con.commit(); con.close()
+        st.rebuild_summary(backfill[0], backfill[-1])
+        q = "SELECT hour_ts, round(d3, 6), round(secs, 3), n FROM hours ORDER BY 1"
+        ranged = query(st, q)
+        st.rebuild_summary()
+        self.assertEqual(query(st, q), ranged)
+        st.close()
+
     def test_plans_use_whole_hour_windows(self):
         from datetime import datetime
         st = Store(self.path)
