@@ -8,6 +8,7 @@ _Started 14 Nov 2026 from a photo of the meter, the cable's datasheet, raw P1 ca
 - **P1 port:** active, **unencrypted, DSMR 5.0 plain text**, **115200 baud 8N1**, one telegram per second, 475 bytes each, CRC16 verified.
 - **Cable:** genuine FTDI FT232RL. It uses macOS's built-in driver, so nothing was installed.
 - **Non-Dutch twist:** **three** tariff registers (`x.8.11` / `x.8.12` / `x.8.13`) instead of the Dutch two (`x.8.1` / `x.8.2`), plus a one-entry interval log (`99.1.0`). Standard DSMR integrations may miss the kWh totals.
+- **A second MA110M** in another flat sends exactly the same telegram format (§10), so everything here applies to it too.
 - **History over P1:** none beyond the last interval. Lifetime totals are available. Detailed history lives in the meter (encrypted, not readable by us; §9) and with IEC (online personal area).
 
 ---
@@ -145,7 +146,7 @@ Stats, the plan comparison and the hourly chart read only these, about 8,800 row
 
 ## 7. Open questions & next steps
 
-- [ ] Confirm the `99.1.0` interval length (probably 15 min): see whether its timestamp moves in 15-minute steps.
+- [x] Confirm the `99.1.0` interval length: **15 min**, seen on the second meter (§10). Same model and format, so very likely the same here.
 - [ ] Confirm the counter mapping (T1 = peak, T3 = off-peak): expect a switch to T1 at 17:00 Sun–Thu. It will show under "Counter switches seen" on the About page.
 - [ ] Import past usage from IEC's personal area (normally 15-minute data) into `p1.sqlite`, so the plan comparison works immediately (§9.3).
 - [x] Run the server automatically on this Mac (launch agent, §6).
@@ -265,3 +266,32 @@ Unofficial but Israel-specific: [yoni03/iec-PlatformIO-3phase](https://github.co
 5. **Trust the numbers:** P1 kWh comes from the same class B registers IEC bills from. The only gaps are below the 20 mA starting current and the 10 W power steps.
 6. **Format may change:** remote firmware updates could change the P1 output. The parser validates CRC and tolerates missing or renamed fields, but watch the log after any unexplained change.
 7. **Relay:** the meter can disconnect supply remotely or on a configured limit. Whether IEC sets a limit for homes is not documented. The 60 A maximum is far above the observed peak (~2.85 kW).
+
+## 10. A second MA110M (another flat)
+
+Read with the same cable and laptop on 14 Nov 2026, 22:19–22:36. The dashboard ran with its own log (`--db data/apartment2.sqlite`), so the two meters' readings never mix (see "One log per meter" in `README.md`).
+
+**Identity.** P1 equipment ID **K06xxx** (masked here as for the home meter; a different ID). The nameplate wasn't photographed.
+
+**Format: identical to the home meter.** Across 31 sampled telegrams:
+- Same header `/KFM5KAIFA-METER` and protocol `1-3:0.2.8(50)` (DSMR 5.0).
+- Same 16 fields in the same order, nothing added or missing.
+- Same size, **475 bytes**, and every CRC valid.
+- Same resolution: power in **10 W** steps, current in 0.1 A steps, voltage in whole volts shown with a `.0`.
+- Same three-counter layout: T2 unused, no export, active tariff `03` (T3) on a Saturday night, and an empty text message.
+
+**What differs is only the readings:**
+
+| | Home meter | Second meter |
+|---|---|---|
+| Lifetime import | ~2,997 kWh | ~1,285 kWh (T1 189.062, T3 1,096.0) |
+| Share on T1 | 23% | 15% |
+| Voltage | 239–240 V | 231–232 V |
+| Load when sampled | 380–390 W | 240–360 W |
+| Meter clock against the Mac | matched to the second | about 1–1.5 s behind (harmless; display only) |
+
+The lower voltage comes from the local grid, not the meter; both are well within the normal range. The T1 share reflects each home's usage pattern, not the meter.
+
+**Interval log (`99.1.0`).** The entry moved from the interval ending **22:15** to the one ending **22:30**: the interval is **15 minutes**. Its 0.196 kWh agrees with the T3 counter, which rose 0.225 kWh between 22:19:52 and about 22:35.
+
+**Cable reconnect.** The cable was unplugged for about 14 minutes (22:20–22:34). The server logged the drop and resumed reading on its own, with no CRC failures.
