@@ -7,7 +7,7 @@ _Started 18 Nov 2026 from photos of the board ([`reference/esp32-wroom32-board-p
 - **Board:** 30-pin **ESP32-WROOM-32** dev board (USB-C, **CH340C** USB-serial), seated on a **pin-header expansion board** with its own power inputs. This covers Option A's "ESP32 dev board" and "expansion board" items, but with pin headers instead of screw terminals.
 - **Chip:** genuine **ESP32-D0WD-V3, revision v3.1**, dual core, 240 MHz, 40 MHz crystal, 4 MB flash.
 - **Security:** **no eFuse locks set.** No flash encryption, no secure boot, JTAG and UART download enabled. It can be reflashed freely.
-- **Firmware now:** Espressif's stock **ESP32-AT v4.1.1.0**, flashed 18 Nov 2026 (§7). It shipped with **v2.4.0.0** (20 May 2022), never configured and never updated (§4–5); a full backup of that is kept.
+- **Firmware now:** Espressif's stock **ESP32-AT v4.1.1.0**, flashed 18 Nov 2026 (§7), with the AT port moved to USB (§8). It **broadcasts an open Wi-Fi access point** whenever powered (§8). It shipped with **v2.4.0.0** (20 May 2022), never configured and never updated (§4–5); a full backup of that is kept.
 - **Serial port on the Mac:** `/dev/cu.usbserial-110`. The dashboard's auto-detect skips it because it isn't an FTDI chip.
 
 ---
@@ -146,4 +146,39 @@ esptool -p /dev/cu.usbserial-110 -b 115200 write-flash 0 ~/Documents/ESP32-backu
 | Check | The partition table and app header read back from the board match the image file |
 | Factory params | In `mfg_nvs` at `0x21000` (v4 moved them from the raw `factory_param` block): same module, power, country, channels and UART1 pins as v2.4.0.0, plus **`sys_store` = 1**, so settings changed by AT commands are saved to flash |
 | First boot | Wrote only `otadata` (app marked valid) and `nvs`. The NVS keys are the same set v2.4.0.0 had: radio calibration, AT UART settings, soft-AP channel, one Espressif flag. So the board as shipped had only ever been booted, never configured |
-| USB output | Boot log only. AT replies (`AT+GMR`, `AT+CIPSTAMAC`, `AT+CWLAP`…) go to UART1 on GPIO16/17, not USB |
+| USB output (stock) | Boot log only. AT replies go to UART1 on GPIO16/17, not USB. Changed in §8 |
+
+## 8. AT commands over USB (18 Nov 2026)
+
+The AT port was moved from UART1 (GPIO16/17) to **UART0 (TX GPIO1, RX GPIO3)**, the pins wired to the CH340C, so AT commands work over `/dev/cu.usbserial-110`. Boot messages and AT replies now share that port; GPIO16/17 are free.
+
+**How:** Espressif's [`tools/at.py`](https://github.com/espressif/esp-at/blob/v4.1.1.0/tools/at.py) at tag `v4.1.1.0` (standard library only; on Python 3.12+ it needs `setuptools` for `distutils`) regenerated the `mfg_nvs` block inside the factory image. Only `0x21000–0x3D000` changed. Just that 112 KB block was written:
+```sh
+python3 at.py modify_bin --uart_num 0 --tx_pin 1 --rx_pin 3 --cts_pin -1 --rts_pin -1 --baud 115200 \
+  --input factory_WROOM-32.bin --output factory_WROOM-32_uart0.bin
+dd if=factory_WROOM-32_uart0.bin of=mfg_nvs_uart0.bin bs=4096 skip=$((0x21)) count=$((0x1c))
+esptool --chip esp32 -p /dev/cu.usbserial-110 -b 115200 write-flash 0x21000 mfg_nvs_uart0.bin
+```
+**Undo:** write the same block from the stock image, or the whole stock `factory_WROOM-32.bin` at `0x0`.
+
+**Talking to it:** 115200 8N1, commands end in `\r\n`, wait for `ready` after a reset. The terminal must leave **DTR off**: on this board DTR and RTS drive the auto-reset circuit, so a terminal that raises them resets the board or holds it in download mode.
+
+**What it reports**
+
+| Command | Result |
+|---|---|
+| `AT+GMR` | AT 4.1.1.0 (`s-ba4dd0e`, 31 Jul 2025), SDK v5.4.1, bin `v4.1.1.0(WROOM-32)` |
+| `AT+CIPSTAMAC?` / `AT+CIPAPMAC?` | Station `d8:13:2a:xx:xx:xx` (same as the eFuse MAC), soft-AP = station + 1 |
+| `AT+SYSRAM?` | **156,744 bytes** free heap, 149,992 minimum since boot |
+| `AT+SYSFLASH?` | User partitions: `mfg_nvs` (`0x21000`, 112 KB), `fatfs` (`0x70000`, 576 KB) |
+| `AT+RFPOWER?` | Wi-Fi TX power **72** (×0.25 dBm = 18 dBm); BLE values 0 (BLE off) |
+| `AT+CWCOUNTRY?` | `CN`, channels 1–13, policy 1 |
+| `AT+UART_CUR?` / `AT+UART_DEF?` | 115200 (measured 115201), 8N1, flow-control flag 1, harmless with no CTS/RTS pins |
+| `AT+SYSSTORE?` | 1: settings changed by commands are saved |
+| `AT+BLEINIT?` | 0: Bluetooth off |
+| `AT+CWHOSTNAME?` | `espressif` |
+| `AT+CWSTATE?` | 0: not connected to any network |
+| `AT+CMD?` | **175 commands**: basic, Wi-Fi, TCP/IP, SSL, MQTT, HTTP client, BLE (incl. HID), BluFi, user OTA |
+| `AT+SYSTEMP?` | Not supported on ESP32 |
+
+**⚠ It runs an open Wi-Fi access point.** `AT+CWMODE?` = **2 (SoftAP)**, and `AT+CWSAP?` = SSID **`ESP_xxxxxx`** (the soft-AP MAC's last three bytes), **no password** (encryption 0), channel 1, up to 10 clients, not hidden, at `192.168.4.1/24`. It's the firmware default and starts whenever the board is powered; the shipped v2.4.0.0 most likely did the same (its NVS already held a soft-AP channel). The AT firmware runs no server on it, so a client gets an address and little else. `AT+CWMODE=0` turns Wi-Fi off, and with `SYSSTORE` = 1 that's saved.
