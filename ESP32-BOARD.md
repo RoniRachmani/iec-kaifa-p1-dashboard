@@ -24,7 +24,8 @@ _Started 18 Nov 2026 from photos of the board ([`reference/esp32-wroom32-board-p
 | USB | **USB-C** (data and power) |
 | USB-serial chip | **WCH CH340C** (SOIC-16, built-in crystal) |
 | Regulator | 1117-series, 3.3 V (SOT-223) |
-| Buttons | **BOOT** (GPIO0) and **EN** (reset) |
+| Buttons | **BOOT** (GPIO0) and **EN** (reset), either side of the USB-C port. See "Buttons" in §6 |
+| Auto-reset | Two small transistors marked `J3Y` next to the CH340C let esptool pulse EN and GPIO0 over the USB serial lines, so flashing needs no button presses |
 | LEDs | **PWR** (red), **D2** (on GPIO2) |
 | Header pins (left) | 3V3, GND, D15, D2, D4, **D16 (RX2)**, D17 (TX2), D5, D18, D19, D21, RX0, TX0, D22, D23 |
 | Header pins (right) | VIN, GND, D13, D12, D14, D27, D26, D25, D33, D32, D35, D34, VN, VP, EN |
@@ -110,6 +111,12 @@ No data anywhere outside these partitions: `0x0–0x1000` and the gap `0x9000–
 
 **Serial speed:** full-flash reads at **921600** and **460800** baud failed with corrupt data on this CH340. **115200 works** (4 MB in 6 min 15 s). If a flash write fails, retry with `-b 115200`.
 
+**Buttons**
+- **EN** is reset. It's wired to the chip's enable pin: pressing turns the chip off, releasing restarts it from the beginning. Nothing in flash is erased.
+- **BOOT** is GPIO0, a strapping pin. Held during a reset, the chip starts the ROM's download mode (for esptool) instead of the firmware in flash. Once the firmware runs, it's an ordinary input that reads low when pressed.
+- **Manual download mode**, if esptool reports "Failed to connect" or "Wrong boot mode" (some USB cables or hubs don't pass the auto-reset pulse): hold BOOT, press and release EN, release BOOT, then run esptool again.
+- **On the meter:** don't hold BOOT while the board powers up, or it waits in download mode and reads nothing. EN is a quick way to restart the reader.
+
 **Read-only checks**
 ```sh
 esptool -p /dev/cu.usbserial-110 flash-id
@@ -137,3 +144,6 @@ esptool -p /dev/cu.usbserial-110 -b 115200 write-flash 0 ~/Documents/ESP32-backu
 | Partitions | Same six as §4 |
 | Boot output | `AT cmd port:uart1 tx:17 rx:16 cts:15 rts:14 baudrate:115200`, `module_name: WROOM-32`, `max tx power=78`, `v4.1.1.0` |
 | Check | The partition table and app header read back from the board match the image file |
+| Factory params | In `mfg_nvs` at `0x21000` (v4 moved them from the raw `factory_param` block): same module, power, country, channels and UART1 pins as v2.4.0.0, plus **`sys_store` = 1**, so settings changed by AT commands are saved to flash |
+| First boot | Wrote only `otadata` (app marked valid) and `nvs`. The NVS keys are the same set v2.4.0.0 had: radio calibration, AT UART settings, soft-AP channel, one Espressif flag. So the board as shipped had only ever been booted, never configured |
+| USB output | Boot log only. AT replies (`AT+GMR`, `AT+CIPSTAMAC`, `AT+CWLAP`…) go to UART1 on GPIO16/17, not USB |
