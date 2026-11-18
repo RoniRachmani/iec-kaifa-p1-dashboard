@@ -105,27 +105,112 @@ class Parse(unittest.TestCase):
         self.assertEqual(parse(body + b"%04X" % crc16(body))["tariff"], 2)
 
 
+FTDI, CH340 = 0x0403, 0x1a86
+
+IOREG_SAMPLE = """\
++-o 4-Port USB 2.0 Hub@00100000  <class IOUSBHostDevice>
+  |   "idVendor" = 3034
+  +-o AppleUSB20HubPort@00130000  <class AppleUSB20HubPort>
+  | +-o USB Serial@00130000  <class IOUSBHostDevice>
+  |   |   "idVendor" = 6790
+  |   +-o IOUserSerial  <class IOUserSerial>
+  |     |   "IOMatchedPersonality" = {"idVendor"=6790,"idProduct"=29987}
+  |     +-o IOSerialBSDClient  <class IOSerialBSDClient>
+  |           "IOCalloutDevice" = "/dev/cu.usbserial-110"
+  +-o AppleUSB20HubPort@00140000  <class AppleUSB20HubPort>
+  | +-o FT232R USB UART@00140000  <class IOUSBHostDevice>
+  |   |   "idVendor" = 1027
+  |   +-o IOSerialBSDClient  <class IOSerialBSDClient>
+  |         "IOCalloutDevice" = "/dev/cu.usbserial-FTAB1234"
+"""
+
+
 class PortDetection(unittest.TestCase):
-    def fake_glob(self, existing):
+    def setUp(self):
+        server._skipped.clear()
+
+    def detect(self, existing, mac=None, linux=None):
+        """find_port() with these device nodes, macOS vendor map and Linux vendors."""
         import fnmatch
-        return lambda pattern: [p for p in existing if fnmatch.fnmatch(p, pattern)]
+        fake_glob = lambda pattern: [p for p in existing if fnmatch.fnmatch(p, pattern)]  # noqa: E731
+        with mock.patch.object(server.glob, "glob", fake_glob), \
+             mock.patch.object(server, "_macos_usb_vendors", return_value=mac or {}), \
+             mock.patch.object(server, "_linux_usb_vendor", side_effect=lambda d: (linux or {}).get(d)), \
+             mock.patch("builtins.print"):
+            return find_port()
 
     def test_macos(self):
-        with mock.patch.object(server.glob, "glob", self.fake_glob(["/dev/cu.usbserial-AB12"])):
-            self.assertEqual(find_port(), "/dev/cu.usbserial-AB12")
+        dev = "/dev/cu.usbserial-AB12"
+        self.assertEqual(self.detect([dev], mac={dev: FTDI}), dev)
+
+    def test_macos_skips_non_ftdi(self):
+        esp, ftdi = "/dev/cu.usbserial-110", "/dev/cu.usbserial-FTAB1234"
+        self.assertEqual(self.detect([esp, ftdi], mac={esp: CH340, ftdi: FTDI}), ftdi)
+
+    def test_macos_only_non_ftdi(self):
+        esp = "/dev/cu.usbserial-110"
+        self.assertIsNone(self.detect([esp], mac={esp: CH340}))
+
+    def test_unknown_vendor_is_accepted(self):
+        # ioreg missing or the node not listed: keep the old behaviour
+        self.assertEqual(self.detect(["/dev/cu.usbserial-AB12"]), "/dev/cu.usbserial-AB12")
+
+    def test_skip_logged_once(self):
+        esp = "/dev/cu.usbserial-110"
+        with mock.patch.object(server.glob, "glob", lambda p: [esp] if p == "/dev/cu.usbserial*" else []), \
+             mock.patch.object(server, "_macos_usb_vendors", return_value={esp: CH340}), \
+             mock.patch("builtins.print") as out:
+            find_port()
+            find_port()
+        self.assertEqual(out.call_count, 1)
+        self.assertIn("--port /dev/cu.usbserial-110", out.call_args[0][0])
 
     def test_linux_prefers_stable_by_id_name(self):
         devs = ["/dev/ttyUSB0", "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AB12-if00-port0"]
-        with mock.patch.object(server.glob, "glob", self.fake_glob(devs)):
-            self.assertEqual(find_port(), devs[1])
+        self.assertEqual(self.detect(devs, linux={d: FTDI for d in devs}), devs[1])
 
     def test_linux_plain_ttyusb(self):
-        with mock.patch.object(server.glob, "glob", self.fake_glob(["/dev/ttyUSB1", "/dev/ttyUSB0"])):
-            self.assertEqual(find_port(), "/dev/ttyUSB0")
+        self.assertEqual(self.detect(["/dev/ttyUSB1", "/dev/ttyUSB0"]), "/dev/ttyUSB0")
+
+    def test_linux_skips_ch340(self):
+        devs = ["/dev/ttyUSB0", "/dev/ttyUSB1"]
+        self.assertEqual(self.detect(devs, linux={devs[0]: CH340, devs[1]: FTDI}), devs[1])
 
     def test_nothing_plugged_in(self):
-        with mock.patch.object(server.glob, "glob", self.fake_glob([])):
-            self.assertIsNone(find_port())
+        self.assertIsNone(self.detect([]))
+
+    def test_ioreg_parsing(self):
+        done = mock.Mock(stdout=IOREG_SAMPLE)
+        with mock.patch.object(server.subprocess, "run", return_value=done):
+            self.assertEqual(server._macos_usb_vendors(),
+                             {"/dev/cu.usbserial-110": CH340, "/dev/cu.usbserial-FTAB1234": FTDI})
+
+    def test_ioreg_missing(self):
+        with mock.patch.object(server.subprocess, "run", side_effect=FileNotFoundError):
+            self.assertEqual(server._macos_usb_vendors(), {})
+
+    def fake_sysfs(self, root, vendor):
+        """A sysfs tree like Linux's: class/tty/ttyUSB0/device -> …/1-1/1-1:1.0/ttyUSB0."""
+        usb = os.path.join(root, "devices", "usb1", "1-1")
+        port = os.path.join(usb, "1-1:1.0", "ttyUSB0")
+        os.makedirs(port)
+        if vendor:
+            with open(os.path.join(usb, "idVendor"), "w") as f:
+                f.write(vendor + "\n")
+        os.makedirs(os.path.join(root, "class", "tty", "ttyUSB0"))
+        os.symlink(port, os.path.join(root, "class", "tty", "ttyUSB0", "device"))
+
+    def test_linux_sysfs_vendor(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = os.path.realpath(d)
+            self.fake_sysfs(root, "1a86")
+            self.assertEqual(server._linux_usb_vendor("/dev/ttyUSB0", sysfs=root), CH340)
+
+    def test_linux_sysfs_no_vendor_stops_at_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = os.path.realpath(d)
+            self.fake_sysfs(root, None)
+            self.assertIsNone(server._linux_usb_vendor("/dev/ttyUSB0", sysfs=root))
 
 
 class Windows(unittest.TestCase):

@@ -19,6 +19,7 @@ import re
 import select
 import socket
 import sqlite3
+import subprocess
 import termios
 import threading
 import time
@@ -518,11 +519,66 @@ def open_port(dev):
 PORT_GLOBS = ["/dev/cu.usbserial*", "/dev/serial/by-id/*FTDI*", "/dev/serial/by-id/*FT232*", "/dev/ttyUSB*"]
 
 
+FTDI_VENDOR = 0x0403
+_skipped = set()  # devices already reported as skipped, so the 2 s retry doesn't spam the log
+
+
+def _macos_usb_vendors():
+    """{"/dev/cu.…": USB vendor ID} from ioreg, or {} if ioreg isn't available.
+    ioreg prints each device's properties before its children, so a serial node
+    belongs to the nearest idVendor above it."""
+    try:
+        out = subprocess.run(["ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-w0"],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    vendors, vendor = {}, None
+    for line in out.splitlines():
+        m = re.search(r'"idVendor" = (\d+)', line)
+        if m:
+            vendor = int(m.group(1))
+            continue
+        m = re.search(r'"IOCalloutDevice" = "([^"]+)"', line)
+        if m:
+            vendors[m.group(1)] = vendor
+    return vendors
+
+
+def _linux_usb_vendor(dev, sysfs="/sys"):
+    """USB vendor ID of a Linux tty from sysfs, or None if it can't be read."""
+    name = os.path.basename(os.path.realpath(dev))
+    path = os.path.realpath(os.path.join(sysfs, "class", "tty", name, "device"))
+    while path.startswith(sysfs + os.sep):
+        try:
+            with open(os.path.join(path, "idVendor")) as f:
+                return int(f.read().strip(), 16)
+        except OSError:
+            path = os.path.dirname(path)
+        except ValueError:
+            return None
+    return None
+
+
 def find_port():
+    """First FTDI serial device. Other USB-serial chips (a CH340 ESP32 board, an
+    Arduino) are skipped: they can't read the inverted P1 signal, and opening one
+    resets an ESP32. A device whose vendor can't be read is accepted. --port
+    bypasses this."""
+    mac = None
     for pattern in PORT_GLOBS:
-        hits = sorted(glob.glob(pattern))
-        if hits:
-            return hits[0]
+        for dev in sorted(glob.glob(pattern)):
+            if dev.startswith("/dev/cu."):
+                if mac is None:
+                    mac = _macos_usb_vendors()
+                vendor = mac.get(dev)
+            else:
+                vendor = _linux_usb_vendor(dev)
+            if vendor is None or vendor == FTDI_VENDOR:
+                return dev
+            if dev not in _skipped:
+                _skipped.add(dev)
+                print(f"skipping {dev}: USB vendor {vendor:04x} is not an FTDI P1 cable"
+                      f" (use --port {dev} to read it anyway)", flush=True)
     return None
 
 

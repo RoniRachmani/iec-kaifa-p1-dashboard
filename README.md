@@ -56,7 +56,7 @@ python3 server.py
 
 Then open http://127.0.0.1:8765 in a browser.
 
-The server finds the cable automatically: `/dev/cu.usbserial*` on macOS, and `/dev/serial/by-id/*FTDI*` or `/dev/ttyUSB*` on Linux.
+The server finds the cable automatically: `/dev/cu.usbserial*` on macOS, and `/dev/serial/by-id/*FTDI*` or `/dev/ttyUSB*` on Linux. It picks only FTDI devices (USB vendor `0403`) and skips other USB-serial chips, such as a CH340 ESP32 board, with a note in the log. Use `--port` to read one of those anyway.
 
 | Option | Default | |
 |---|---|---|
