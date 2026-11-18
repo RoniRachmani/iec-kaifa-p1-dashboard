@@ -170,7 +170,7 @@ Bad parameters return `400`.
 | [`ESP32-READER.md`](ESP32-READER.md) | Parts, wiring and plan for a standalone ESP32 P1 reader |
 | [`ESP32-BOARD.md`](ESP32-BOARD.md) | The ESP32 board on hand: hardware, chip, eFuses, flash layout, firmware and backup |
 | `docs/` | README screenshots and animated demo (demo data) |
-| `reference/` | Datasheets, standards, certificates, tariffs, and a redacted meter photo |
+| `reference/` | Datasheets, standards, certificates, tariffs, a redacted meter photo and an ESP32 board photo |
 | `data/`, `config.json` | Your usage log and prices. Created at runtime and **git-ignored** |
 
 ## Tests

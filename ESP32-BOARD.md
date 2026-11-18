@@ -1,6 +1,6 @@
 # ESP32 board: everything we know
 
-_Started 18 Nov 2026 from a photo of the board, the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`ESP32-READER.md`](ESP32-READER.md)._
+_Started 18 Nov 2026 from photos of the board ([`reference/esp32-wroom32-board-photo.webp`](reference/esp32-wroom32-board-photo.webp)), the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`ESP32-READER.md`](ESP32-READER.md)._
 
 ## Summary
 
@@ -12,7 +12,9 @@ _Started 18 Nov 2026 from a photo of the board, the macOS USB registry, esptool 
 
 ---
 
-## 1. Hardware: from the photo
+## 1. Hardware: from the photos
+
+<img src="reference/esp32-wroom32-board-photo.webp" alt="ESP32-WROOM-32 dev board on its pin-header expansion board" width="360">
 
 **Dev board (top)**
 
@@ -34,7 +36,8 @@ _Started 18 Nov 2026 from a photo of the board, the macOS USB registry, esptool 
 | Power inputs | **DC barrel jack 6.5–16 V**, micro-USB, USB-C (`USB5V`). These are power only; data goes through the dev board's own USB-C |
 | Power parts | SS24 Schottky diode, a 1117-series regulator (marked `1117 50`, probably 5 V for the barrel jack), electrolytic capacitor |
 | Indicator | Power LED (`PWR-LED`) |
-| GPIO headers | One **GND / VCC / signal** triplet per pin (male pins), labelled with the dev board's pin names |
+| GPIO headers | One triplet per pin (male pins), labelled with the dev board's pin names. Columns marked **S / V / G**: signal on the outer edge, VCC in the middle, GND next to the dev board |
+| Extra header | 4 pins: **D22, D21, VCC, GND** (the ESP32's default I²C pins, SCL/SDA) |
 | **JUMP** (yellow jumper) | Sets the **VCC pin of every triplet** to **3.3 V or 5 V** |
 | Power block (right) | Separate **5V**, **3.3V** and **GND** pins |
 
