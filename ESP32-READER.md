@@ -75,6 +75,8 @@ Prices are rough AliExpress ranges, not checked. The links are the ones klimofey
 
 ### Option A: ESP32 on a screw-terminal board (recommended; no soldering except the cable)
 
+> **On hand since 18 Nov 2026:** a 30-pin ESP32-WROOM-32 (CH340C, USB-C) on a pin-header expansion board, so the first two rows are covered, with Dupont wires instead of screw terminals. Details in [`ESP32-BOARD.md`](ESP32-BOARD.md).
+
 | ✓ | Item | Search for | Qty | Must have | ≈ $ |
 |---|---|---|---|---|---|
 | ☐ | ESP32 dev board | `ESP32 WROOM-32D 30pin USB-C CH340` | 1 (buy 2, cheap spare) | **30-pin** version, USB-C | 3–5 each |
