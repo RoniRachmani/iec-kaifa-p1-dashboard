@@ -29,6 +29,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+WEB_DIR = os.path.join(HERE, "web")
+PLANS_FILE = os.path.join(HERE, "tariffs", "plans.json")
 LINE = re.compile(r"^(\d+-\d+:\d+\.\d+\.\d+)((?:\([^)]*\))+)\s*$")
 VALS = re.compile(r"\(([^)]*)\)")
 LOG_EVERY = 10  # seconds between SQLite rows
@@ -428,10 +430,10 @@ class Store:
 
     def plans(self, prices, days):
         try:
-            with open(os.path.join(HERE, "plans.json"), encoding="utf-8") as fh:
+            with open(PLANS_FILE, encoding="utf-8") as fh:
                 spec = json.load(fh)
         except (OSError, ValueError) as err:
-            return {"error": f"plans.json: {err}"}
+            return {"error": f"tariffs/plans.json: {err}"}
         plans = spec["plans"]
         covered = kwh = cost = 0.0
         in_cost = [0.0] * len(plans)
@@ -781,7 +783,7 @@ def make_handler(hub, store, config, allow_hosts=()):
             q = parse_qs(u.query)
             if u.path in ("/", "/index.html", "/about", "/about.html"):
                 page = "about.html" if u.path.startswith("/about") else "index.html"
-                with open(os.path.join(HERE, page), "rb") as fh:
+                with open(os.path.join(WEB_DIR, page), "rb") as fh:
                     body = fh.read()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")

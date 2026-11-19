@@ -130,7 +130,7 @@ Gaps in logging don't lose energy totals: the next reading's counters show exact
 
 Files, quick start, options, API and the login-item install are in [`README.md`](../README.md). Tests: `python3 -m unittest discover -s tests`.
 
-This Mac runs it as the launch agent `local.iec-kaifa-p1-dashboard` (installed from `launchd/`). It starts at login, restarts if it crashes, and logs to `~/Library/Logs/iec-kaifa-p1-dashboard.log`. Logging pauses while the Mac sleeps or is logged out. When the cable is unplugged, it keeps serving the page and resumes within about 2 s of the cable returning.
+This Mac runs it as the launch agent `local.iec-kaifa-p1-dashboard` (installed from `deploy/launchd/`). It starts at login, restarts if it crashes, and logs to `~/Library/Logs/iec-kaifa-p1-dashboard.log`. Logging pauses while the Mac sleeps or is logged out. When the cable is unplugged, it keeps serving the page and resumes within about 2 s of the cable returning.
 
 **Database schema:** `readings(ts, p_in, p_max, p_out, v, a, i1, i2, i3, e1, e2, e3, tariff)`. Here `p_in` is the 10-second average in W, `p_max` the 10-second peak, `i1–3` / `e1–3` the import / export counters in kWh, and `ts` Unix time.
 
@@ -155,11 +155,11 @@ Stats, the plan comparison and the hourly chart read only these, about 8,800 row
 - [x] Estimated cost: IEC flat rate set (§8), and supplier plan comparison added.
 - [ ] Press the meter's unsealed **Display** button (upper orange button) and note which items the LCD cycles through.
 - [ ] Cross-check P1 power with the test LED: 2000 blinks per kWh (§9.1).
-- [ ] Await Kaifa's reply: emailed `metering@kaifa.cn` on 2026-11-14 asking for the "MA110M and MA309M Meter Family User Manual" (P1 tariff registers `1.8.11–13`, display menu). If there's no answer in about two weeks, follow up or ask IEC (website or 103). Save anything received in `reference/meter/`.
+- [ ] Await Kaifa's reply: emailed `metering@kaifa.cn` on 2026-11-14 asking for the "MA110M and MA309M Meter Family User Manual" (P1 tariff registers `1.8.11–13`, display menu). If there's no answer in about two weeks, follow up or ask IEC (website or 103). Save anything received in `docs/reference/meter/`.
 
 ## 8. IEC tariffs (from 1 July 2026, incl. 18% VAT)
 
-Source: [IEC English tariff sheet](../reference/tariffs/iec-electricity-tariffs-2026-07.pdf) (tariff update 1726).
+Source: [IEC English tariff sheet](reference/tariffs/iec-electricity-tariffs-2026-07.pdf) (tariff update 1726).
 
 **Flat residential rate:** 63.52 ag/kWh (₪0.6352). Fixed charge for a bi-monthly single-phase customer: distribution ₪11.76 + supply ₪18.41 = ₪30.17/month, plus a capacity charge of ₪7.29 per kVA per year. The dashboard is set to ₪0.6352 for all three registers.
 
@@ -182,22 +182,22 @@ Holidays count as Saturday and their eves as Friday.
 
 **Expected register mapping:** T3 is off-peak (observed on Sat 01:20, an autumn off-peak time) and T1 is peak. This is unconfirmed until a Sun–Thu 17:00 switch is logged.
 
-**Supplier plan comparison:** the dashboard card "Supplier plans" (API: `/api/plans?days=28`) applies each offer in `plans.json` to the logged usage. See the [July 2026 supplier plans](supplier-plans-2026-07.md) for the offers and their source.
+**Supplier plan comparison:** the dashboard card "Supplier plans" (API: `/api/plans?days=28`) applies each offer in `tariffs/plans.json` to the logged usage. See the [July 2026 supplier plans](supplier-plans-2026-07.md) for the offers and their source.
 
 - Energy comes from import-register deltas between consecutive rows. Gaps longer than 120 s are skipped.
 - The savings are projected to a month.
 - Night windows (23–07) belong to the night they start on (Sun–Thu).
-- Edit `plans.json` when offers change. No restart is needed.
+- Edit `tariffs/plans.json` when offers change. No restart is needed.
 
 ## 9. Official documentation and what it tells us
 
-There is no public Kaifa datasheet or manual for the MA110M, and no IEC P1 specification turned up. Kaifa's manual is the "MA110M and MA309M Meter Family User Manual", Rev. 1.0, which is not public. The closest official sources, saved in `reference/`:
+There is no public Kaifa datasheet or manual for the MA110M, and no IEC P1 specification turned up. Kaifa's manual is the "MA110M and MA309M Meter Family User Manual", Rev. 1.0, which is not public. The closest official sources, saved in `docs/reference/`:
 
 | File | What it is |
 |---|---|
-| [Kaifa MA110M type approval](../reference/meter/kaifa-ma110m-type-approval-smu-tsk-221-23-146-sk.pdf) | Slovak Metrology Institute type approval TSK 221/23-146 for the MA110M, 19 Oct 2023, valid to 2033. Certificate plus a 16-page assessment report with drawings (in Slovak). [Source](https://www.normoff.gov.sk/files/typovky/tsk/TSK_221_23_146.pdf) |
-| [Kaifa MA110M G3-PLC certificate](../reference/meter/kaifa-ma110m-g3-plc-certificate-2022.pdf) | G3-PLC (power-line communication) certificate for the MA110M, 14 Jul 2022, HW V1.3, FW V096011. Not relevant to this meter's 4G module. [Source](https://g3-alliance.com/download/75/pdf_certified_products/3296/g3-2207-524-2-c5-g3-plc-certificate-fcc-kaifa-ma110m-for-publication.pdf) |
-| [DSMR 5.0.2 P1 Companion Standard](../reference/p1/dsmr-5.0.2-p1-companion-standard.pdf) | Netbeheer Nederland DSMR 5.0.2 P1 Companion Standard (26 Feb 2016): the official spec of the P1 port this meter implements. [Source](https://www.netbeheernederland.nl/sites/default/files/2024-02/dsmr_5.0.2_p1_companion_standard.pdf) |
+| [Kaifa MA110M type approval](reference/meter/kaifa-ma110m-type-approval-smu-tsk-221-23-146-sk.pdf) | Slovak Metrology Institute type approval TSK 221/23-146 for the MA110M, 19 Oct 2023, valid to 2033. Certificate plus a 16-page assessment report with drawings (in Slovak). [Source](https://www.normoff.gov.sk/files/typovky/tsk/TSK_221_23_146.pdf) |
+| [Kaifa MA110M G3-PLC certificate](reference/meter/kaifa-ma110m-g3-plc-certificate-2022.pdf) | G3-PLC (power-line communication) certificate for the MA110M, 14 Jul 2022, HW V1.3, FW V096011. Not relevant to this meter's 4G module. [Source](https://g3-alliance.com/download/75/pdf_certified_products/3296/g3-2207-524-2-c5-g3-plc-certificate-fcc-kaifa-ma110m-for-publication.pdf) |
+| [DSMR 5.0.2 P1 Companion Standard](reference/p1/dsmr-5.0.2-p1-companion-standard.pdf) | Netbeheer Nederland DSMR 5.0.2 P1 Companion Standard (26 Feb 2016): the official spec of the P1 port this meter implements. [Source](https://www.netbeheernederland.nl/sites/default/files/2024-02/dsmr_5.0.2_p1_companion_standard.pdf) |
 
 Unofficial but Israel-specific: [yoni03/iec-PlatformIO-3phase](https://github.com/yoni03/iec-PlatformIO-3phase) (MIT) is an ESP32 reader for IEC's Kaifa MA110M / MA309M meters. It uses 115200 baud with CRC checking and the Israeli OBIS codes `1.8.11–13`, matching what we measured. It builds on klimofey/iec-p1-esphome.
 

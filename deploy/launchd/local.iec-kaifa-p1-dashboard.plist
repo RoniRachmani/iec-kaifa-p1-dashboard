@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Template: replace __PYTHON__, __REPO__ and __HOME__ (see README, "Run at login"). -->
+<!-- Template: replace __PYTHON__, __REPO__ and __HOME__ (see README, "Run in the background"). -->
 <plist version="1.0">
 <dict>
   <key>Label</key>

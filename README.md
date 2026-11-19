@@ -3,8 +3,8 @@
 A local, live electricity dashboard for Israel Electric Corporation (IEC) **Kaifa** smart meters, read through the **P1 port** (DSMR 5.0) with a USB cable.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/dashboard-dark.png">
-  <img src="assets/dashboard-light.png" alt="Dashboard: live power, today's kWh and cost, peak, meter total, a 24-hour power chart with boiler runs, and energy by hour" width="800">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dashboard-dark.png">
+  <img src="docs/assets/dashboard-light.png" alt="Dashboard: live power, today's kWh and cost, peak, meter total, a 24-hour power chart with boiler runs, and energy by hour" width="800">
 </picture>
 
 <sub>Screenshot with demo data.</sub>
@@ -12,7 +12,7 @@ A local, live electricity dashboard for Israel Electric Corporation (IEC) **Kaif
 <details>
 <summary><b>See it running</b> (animated, 4.7 MB)</summary>
 
-![Animated demo: a boiler switches on live, the power chart switches between 1 hour, 24 hours and 7 days with hover details, the supplier plan comparison, then the meter details page with the raw telegram](assets/dashboard-demo.gif)
+![Animated demo: a boiler switches on live, the power chart switches between 1 hour, 24 hours and 7 days with hover details, the supplier plan comparison, then the meter details page with the raw telegram](docs/assets/dashboard-demo.gif)
 
 <sub>Demo data and a simulated meter.</sub>
 </details>
@@ -97,7 +97,7 @@ A log from before this check existed is claimed by the first meter whose counter
 ```sh
 REPO="$PWD"; PY="$(command -v python3)"
 sed -e "s#__PYTHON__#$PY#g" -e "s#__REPO__#$REPO#g" -e "s#__HOME__#$HOME#g" \
-    launchd/local.iec-kaifa-p1-dashboard.plist > ~/Library/LaunchAgents/local.iec-kaifa-p1-dashboard.plist
+    deploy/launchd/local.iec-kaifa-p1-dashboard.plist > ~/Library/LaunchAgents/local.iec-kaifa-p1-dashboard.plist
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.iec-kaifa-p1-dashboard.plist
 ```
 
@@ -146,7 +146,7 @@ To report a vulnerability, use GitHub's [private vulnerability reporting](https:
 
 - **Prices:** set per tariff counter with the **Price** button. They are saved to `config.json`. The button offers presets for the IEC flat rate and this season's IEC time-of-use prices.
 - **Cost covers electricity used only.** IEC's fixed monthly charge and the capacity charge are not included.
-- **Supplier plans:** the comparison card reads [`plans.json`](plans.json). Edit it when offers change; no restart needed.
+- The supplier comparison card reads [`tariffs/plans.json`](tariffs/plans.json). Changes take effect without a restart.
 - **Dates:** IEC prices are from 1 July 2026 and supplier plans from 15 July 2026. Check current rates.
 
 ## API
@@ -168,14 +168,13 @@ Bad parameters return `400`.
 | Path | |
 |---|---|
 | `server.py` | Serial reader, CRC check, SQLite logger with hourly summary, web server |
-| `index.html` | Dashboard |
-| `about.html` | Meter details page |
-| `plans.json` | Supplier offers for the plan comparison |
-| `launchd/` | macOS login-item template |
+| [`web/`](web/) | Dashboard and meter details pages |
+| [`tariffs/`](tariffs/) | Supplier offers for the plan comparison |
+| [`deploy/launchd/`](deploy/launchd/) | macOS login-item template |
 | `tests/` | Unit tests (stdlib `unittest`) and a masked sample telegram |
 | [`docs/`](docs/) | Technical guides and supplier plan notes |
-| [`assets/`](assets/) | Dashboard screenshots and animated demo using demo data |
-| [`reference/`](reference/) | [ESP32 board photos](reference/esp32/), [meter photo and certificates](reference/meter/), [P1 standard and cable manual](reference/p1/), and [IEC tariff sheet](reference/tariffs/iec-electricity-tariffs-2026-07.pdf) |
+| [`docs/assets/`](docs/assets/) | Dashboard screenshots and animated demo using demo data |
+| [`docs/reference/`](docs/reference/) | [ESP32 board photos](docs/reference/esp32/), [meter photo and certificates](docs/reference/meter/), [P1 standard and cable manual](docs/reference/p1/), and [IEC tariff sheet](docs/reference/tariffs/iec-electricity-tariffs-2026-07.pdf) |
 | `data/`, `config.json` | Your usage log and prices. Created at runtime and **git-ignored** |
 
 ## Tests
@@ -186,7 +185,7 @@ python3 -m unittest discover -s tests
 
 ## Licence
 
-MIT. See [`LICENSE`](LICENSE). Documents in `reference/` belong to their publishers.
+MIT. See [`LICENSE`](LICENSE). Documents in `docs/reference/` belong to their publishers.
 
 ## Disclaimer
 

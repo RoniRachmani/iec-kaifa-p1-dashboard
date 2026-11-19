@@ -1,6 +1,6 @@
 # ESP32 board: everything we know
 
-_Started 18 Nov 2026 from [photos of the boards](../reference/esp32/), the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`esp32-reader.md`](esp32-reader.md)._
+_Started 18 Nov 2026 from [photos of the boards](reference/esp32/), the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`esp32-reader.md`](esp32-reader.md)._
 
 ## Summary
 
@@ -14,11 +14,11 @@ _Started 18 Nov 2026 from [photos of the boards](../reference/esp32/), the macOS
 
 ## 1. Hardware: from the photos
 
-<img src="../reference/esp32/esp-wroom-32-on-expansion-board.webp" alt="ESP-WROOM-32 development board mounted on its pin-header expansion board" width="360">
+<img src="reference/esp32/esp-wroom-32-on-expansion-board.webp" alt="ESP-WROOM-32 development board mounted on its pin-header expansion board" width="360">
 
 ### Development board
 
-<a href="../reference/esp32/esp-wroom-32-30-pin-usb-c-development-board.png"><img src="../reference/esp32/esp-wroom-32-30-pin-usb-c-development-board.png" alt="Development board and pin labels with its USB-C port at the bottom" width="280"></a>
+<a href="reference/esp32/esp-wroom-32-30-pin-usb-c-development-board.png"><img src="reference/esp32/esp-wroom-32-30-pin-usb-c-development-board.png" alt="Development board and pin labels with its USB-C port at the bottom" width="280"></a>
 
 | Item | Value |
 |---|---|
@@ -34,7 +34,7 @@ _Started 18 Nov 2026 from [photos of the boards](../reference/esp32/), the macOS
 
 ### Expansion board
 
-<a href="../reference/esp32/esp32-30-pin-expansion-board.png"><img src="../reference/esp32/esp32-30-pin-expansion-board.png" alt="Expansion board with its pin headers, power connectors, and voltage jumper" width="460"></a>
+<a href="reference/esp32/esp32-30-pin-expansion-board.png"><img src="reference/esp32/esp32-30-pin-expansion-board.png" alt="Expansion board with its pin headers, power connectors, and voltage jumper" width="460"></a>
 
 | Item | Value |
 |---|---|

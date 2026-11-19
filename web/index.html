@@ -566,7 +566,7 @@ function renderPlans() {
       <div class="val">${money(p.per_month)}<div>${p.share == null ? '' : Math.round(p.share * 100) + '% of use'}</div></div>
     </div>`).join('');
   $('#plans-foot').textContent = `Prices from ${d.source}. Discounts apply to the energy charge only; holidays are treated as normal days. ` +
-    'Plans cover your logged hours only, so Mac sleep or an unplugged cable leaves gaps. Edit plans.json to update offers.';
+    'Plans cover your logged hours only, so Mac sleep or an unplugged cable leaves gaps. Edit tariffs/plans.json to update offers.';
   document.querySelectorAll('.prow').forEach(r => {
     r.addEventListener('pointermove', e => {
       const p = d.plans[+r.dataset.i];

@@ -2,9 +2,9 @@
 
 Source: Ministry of Energy and Infrastructure press release, "רפורמת החשמל מסכמת עוד שנה מוצלחת…", published 14.01.2026, updated 15.07.2026. URL: https://www.gov.il/he/pages/news-140126
 
-The dashboard's "Supplier plans" card uses these offers, coded in [`plans.json`](../plans.json). All discounts are off the IEC rate. "Smart meter" plans apply only inside the stated hours, Sunday to Thursday (א–ה).
+The dashboard's "Supplier plans" card uses these offers, coded in [`tariffs/plans.json`](../tariffs/plans.json). All discounts are off the IEC rate. "Smart meter" plans apply only inside the stated hours, Sunday to Thursday (א–ה).
 
-When supplier offers change, update [`plans.json`](../plans.json) and record the new offers and source date in a dated note. Use the [July 2026 IEC tariff sheet](../reference/tariffs/iec-electricity-tariffs-2026-07.pdf) for the baseline in this snapshot.
+When supplier offers change, update [`tariffs/plans.json`](../tariffs/plans.json) and record the new offers and source date in a dated note. Use the [July 2026 IEC tariff sheet](reference/tariffs/iec-electricity-tariffs-2026-07.pdf) for the baseline in this snapshot.
 
 ## English summary
 

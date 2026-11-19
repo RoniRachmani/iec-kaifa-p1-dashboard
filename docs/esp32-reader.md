@@ -2,7 +2,7 @@
 
 **Goal:** read the meter around the clock without the Mac. A small Wi-Fi board plugs into the P1 port and runs on the port's own 5 V supply. It keeps recording while the Mac sleeps, and the dashboard catches up when the Mac wakes.
 
-Specs below come from the [DSMR 5.0.2 P1 standard](../reference/p1/dsmr-5.0.2-p1-companion-standard.pdf), §5–6, and from what we measured on this meter (`meter.md` §3).
+Specs below come from the [DSMR 5.0.2 P1 standard](reference/p1/dsmr-5.0.2-p1-companion-standard.pdf), §5–6, and from what we measured on this meter (`meter.md` §3).
 
 ## Parts
 
