@@ -48,7 +48,9 @@ h2 { font-size: 15px; font-weight: 600; margin: 0; }
 nav { display: flex; gap: 4px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
 nav a { color: var(--text-secondary); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
 nav a[aria-current="page"] { background: var(--bg); color: var(--text-primary); }
-.status { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+nav a:not([aria-current]):hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); color: var(--text-primary); }
+:where(a, button, input):focus-visible { outline: 2px solid var(--series-1); outline-offset: 2px; }
+.status { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; font-variant-numeric: tabular-nums; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .status[data-s="live"] .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
 .status[data-s="stale"] .dot { background: var(--warning); }
@@ -56,10 +58,11 @@ nav a[aria-current="page"] { background: var(--bg); color: var(--text-primary); 
 .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; }
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .label { color: var(--text-secondary); font-size: 13px; }
-.hero-value { font-size: 56px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; margin-top: 6px; }
+.top > .card:first-child { display: flex; flex-direction: column; }
+.hero-value { font-size: 56px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .hero-value .unit { font-size: 22px; font-weight: 500; color: var(--text-secondary); margin-left: 6px; letter-spacing: 0; }
 .hero-sub, .sub { color: var(--text-muted); font-size: 13px; margin-top: 6px; }
-.tile .value { font-size: 26px; font-weight: 600; margin-top: 6px; }
+.tile .value { font-size: 26px; font-weight: 600; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .tile .value small { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
@@ -67,8 +70,10 @@ nav a[aria-current="page"] { background: var(--bg); color: var(--text-primary); 
   font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--text-secondary);
   padding: 4px 10px; border-radius: 6px; cursor: pointer;
 }
+.seg button:not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); color: var(--text-primary); }
 .seg button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
 .linkbtn { font: inherit; font-size: 13px; background: none; border: 0; color: var(--series-1); cursor: pointer; padding: 4px 0; }
+.linkbtn:hover { text-decoration: underline; text-underline-offset: 3px; }
 .chart { position: relative; height: 260px; touch-action: pan-y; }
 .chart.short { height: 220px; }
 .chart svg { display: block; overflow: visible; }
@@ -104,16 +109,20 @@ th { color: var(--text-secondary); font-weight: 500; }
 .panel[hidden] { display: none; }
 .panel .fields { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
 .panel label { display: grid; gap: 4px; font-size: 13px; color: var(--text-secondary); }
+.panel label[hidden] { display: none; }
 .panel input { font: inherit; width: 110px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
   background: var(--bg); color: var(--text-primary); }
 .panel input.cur { width: 60px; }
 .panel .actions { display: flex; gap: 8px; align-items: center; }
 .btn { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
   background: var(--bg); color: var(--text-primary); cursor: pointer; }
+.btn:hover { background: color-mix(in srgb, var(--text-primary) 6%, var(--bg)); }
 .btn.primary { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+.btn.primary:hover { background: color-mix(in srgb, #000 12%, var(--series-1)); }
 .hint { color: var(--text-muted); font-size: 12px; }
-.hero-cost { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.hero-cost b { font-size: 22px; font-weight: 600; }
+.hero-cost { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.hero-sub { margin-bottom: 14px; }
+.hero-cost b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .hero-cost span { color: var(--text-secondary); font-size: 13px; }
 .plans { display: grid; gap: 2px; margin-top: 8px; }
 .prow { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) 6.5rem; gap: 12px; align-items: center; padding: 6px 4px; border-radius: 6px; }
@@ -122,7 +131,7 @@ th { color: var(--text-secondary); font-weight: 500; }
 .prow .nm b { font-weight: 600; }
 .prow .nm div { color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prow .track { height: 14px; }
-.prow .bar { height: 14px; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+.prow .bar { height: 14px; background: color-mix(in srgb, var(--good) 70%, var(--surface-1)); border-radius: 0 4px 4px 0; min-width: 2px; }
 .prow .val { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
 .prow .val div { color: var(--text-muted); font-size: 12px; }
 .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px; margin-left: 6px;
@@ -132,6 +141,10 @@ th { color: var(--text-secondary); font-weight: 500; }
 @media (max-width: 760px) {
   .prow { grid-template-columns: minmax(0, 1fr) 5.5rem; }
   .prow .track { grid-column: 1 / -1; grid-row: 2; }
+  .prow .nm div { white-space: normal; }
+  .seg button, nav a, .linkbtn, .ratebtn, .btn { min-height: 44px; }
+  nav a { display: inline-flex; align-items: center; }
+  .seg button { padding: 4px 12px; }
 }
 @media (max-width: 760px) {
   .top { grid-template-columns: 1fr; }
@@ -156,13 +169,13 @@ th { color: var(--text-secondary); font-weight: 500; }
 
   <section class="card panel" id="rate-panel" hidden>
     <h2>Electricity price</h2>
-    <div class="hint">Price per kWh including VAT. The meter counts energy on three counters: T1 (probably IEC peak), T2 (unused) and T3 (probably off-peak).
-      On the IEC flat rate or a supplier's fixed discount every kWh costs the same, so use one price for all three. Only IEC time-of-use prices them differently.</div>
+    <div class="hint">Price per kWh including VAT. The meter counts energy on two counters: T1 (probably IEC peak) and T3 (probably off-peak).
+      On the IEC flat rate or a supplier's fixed discount every kWh costs the same, so use one price for both. Only IEC time-of-use prices them differently.</div>
     <div class="actions"><button class="btn" id="preset-flat">IEC flat rate: ₪0.6352</button><button class="btn" id="preset-tou">IEC time-of-use, this season</button></div>
     <div class="fields">
       <label>Currency<input class="cur" id="cfg-cur" maxlength="3"></label>
       <label>T1 · peak<input id="cfg-p1" type="number" step="0.0001" min="0" inputmode="decimal"></label>
-      <label>T2 · unused<input id="cfg-p2" type="number" step="0.0001" min="0" inputmode="decimal"></label>
+      <label hidden>T2 · unused<input id="cfg-p2" type="number" step="0.0001" min="0" inputmode="decimal"></label>
       <label>T3 · off-peak<input id="cfg-p3" type="number" step="0.0001" min="0" inputmode="decimal"></label>
     </div>
     <div class="actions"><button class="btn primary" id="cfg-save">Save</button><button class="btn" id="cfg-cancel">Cancel</button><span class="hint" id="cfg-msg"></span></div>
@@ -248,9 +261,9 @@ const fmtW = w => w == null ? '—' : powerParts(w).join(' ');
 const fmtAxisW = w => w >= 1000 ? (w / 1000).toFixed(w % 1000 ? 1 : 0) + ' kW' : w + ' W';
 const fmtKwh = k => k >= 1000 ? Math.round(k).toLocaleString() : k.toFixed(k < 10 ? 2 : 1);
 const tf = (t, o) => new Date(t * 1000).toLocaleTimeString([], o);
-const hhmm = t => tf(t, { hour: '2-digit', minute: '2-digit' });
-const hhmmss = t => tf(t, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const dayHHmm = t => new Date(t * 1000).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+const hhmm = t => tf(t, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const hhmmss = t => tf(t, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+const dayHHmm = t => new Date(t * 1000).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const meterClock = s => s && s.length >= 12 ? `${s.slice(6, 8)}:${s.slice(8, 10)}:${s.slice(10, 12)}` : '';
 const tzOff = () => -new Date().getTimezoneOffset() * 60;
 
@@ -422,7 +435,7 @@ function renderHero() {
     r.tariff != null && `Counter: ${tName(r.tariff)}`].filter(Boolean).join(' · ');
   const price = priceFor(r.tariff);
   $('#cost-hour').textContent = exporting ? '—' : money((r.p_in || 0) / 1000 * price);
-  $('#cost-hour-sub').textContent = `per hour · ${S.cfg.currency}${price}/kWh, ${planLabel()}${flatPrice() == null ? `, now ${tName(r.tariff)}` : ''}${S.cfg.estimated ? ' (estimated price)' : ''}`;
+  $('#cost-hour-sub').textContent = `per hour${flatPrice() == null ? ` · ${S.cfg.currency}${price}/kWh, now ${tName(r.tariff)}` : ''}`;
 }
 function renderMeter(r) {
   // A log belongs to one meter. Another meter is shown live but not saved, and the
