@@ -10,7 +10,7 @@ A local, live electricity dashboard for Israel Electric Corporation (IEC) **Kaif
 <sub>Screenshot with demo data.</sub>
 
 <details>
-<summary><b>See it running</b> (animated, 0.4 MB)</summary>
+<summary><b>See it running</b> (animated, 4.7 MB)</summary>
 
 ![Animated demo: a boiler switches on live, the power chart switches between 1 hour, 24 hours and 7 days with hover details, the supplier plan comparison, then the meter details page with the raw telegram](docs/dashboard-demo.gif)
 
