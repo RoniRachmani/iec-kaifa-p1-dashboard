@@ -1,6 +1,6 @@
 # ESP32 board: everything we know
 
-_Started 18 Nov 2026 from photos of the board ([`reference/esp-wroom-32-on-expansion-board.webp`](reference/esp-wroom-32-on-expansion-board.webp)), the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`ESP32-READER.md`](ESP32-READER.md)._
+_Started 18 Nov 2026 from [photos of the boards](../reference/esp32/), the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`esp32-reader.md`](esp32-reader.md)._
 
 ## Summary
 
@@ -14,9 +14,11 @@ _Started 18 Nov 2026 from photos of the board ([`reference/esp-wroom-32-on-expan
 
 ## 1. Hardware: from the photos
 
-<img src="reference/esp-wroom-32-on-expansion-board.webp" alt="ESP32-WROOM-32 dev board on its pin-header expansion board" width="360">
+<img src="../reference/esp32/esp-wroom-32-on-expansion-board.webp" alt="ESP-WROOM-32 development board mounted on its pin-header expansion board" width="360">
 
-**Dev board (top)**
+### Development board
+
+<a href="../reference/esp32/esp-wroom-32-30-pin-usb-c-development-board.png"><img src="../reference/esp32/esp-wroom-32-30-pin-usb-c-development-board.png" alt="Development board and pin labels with its USB-C port at the bottom" width="280"></a>
 
 | Item | Value |
 |---|---|
@@ -27,10 +29,12 @@ _Started 18 Nov 2026 from photos of the board ([`reference/esp-wroom-32-on-expan
 | Buttons | **BOOT** (GPIO0) and **EN** (reset), either side of the USB-C port. See "Buttons" in §6 |
 | Auto-reset | Two small transistors marked `J3Y` next to the CH340C let esptool pulse EN and GPIO0 over the USB serial lines, so flashing needs no button presses |
 | LEDs | **PWR** (red), **D2** (on GPIO2) |
-| Header pins (left) | 3V3, GND, D15, D2, D4, **D16 (RX2)**, D17 (TX2), D5, D18, D19, D21, RX0, TX0, D22, D23 |
-| Header pins (right) | VIN, GND, D13, D12, D14, D27, D26, D25, D33, D32, D35, D34, VN, VP, EN |
+| Left header, top to bottom with USB-C at the bottom | EN, VP, VN, D34, D35, D32, D33, D25, D26, D27, D14, D12, D13, GND, VIN |
+| Right header, top to bottom with USB-C at the bottom | D23, D22, TX0, RX0, D21, D19, D18, D5, D17 (TX2), **D16 (RX2)**, D4, D2, D15, GND, 3V3 |
 
-**Expansion board (bottom)**
+### Expansion board
+
+<a href="../reference/esp32/esp32-30-pin-expansion-board.png"><img src="../reference/esp32/esp32-30-pin-expansion-board.png" alt="Expansion board with its pin headers, power connectors, and voltage jumper" width="460"></a>
 
 | Item | Value |
 |---|---|

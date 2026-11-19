@@ -3,8 +3,8 @@
 A local, live electricity dashboard for Israel Electric Corporation (IEC) **Kaifa** smart meters, read through the **P1 port** (DSMR 5.0) with a USB cable.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/dashboard-dark.png">
-  <img src="docs/dashboard-light.png" alt="Dashboard: live power, today's kWh and cost, peak, meter total, a 24-hour power chart with boiler runs, and energy by hour" width="800">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/dashboard-dark.png">
+  <img src="assets/dashboard-light.png" alt="Dashboard: live power, today's kWh and cost, peak, meter total, a 24-hour power chart with boiler runs, and energy by hour" width="800">
 </picture>
 
 <sub>Screenshot with demo data.</sub>
@@ -12,7 +12,7 @@ A local, live electricity dashboard for Israel Electric Corporation (IEC) **Kaif
 <details>
 <summary><b>See it running</b> (animated, 4.7 MB)</summary>
 
-![Animated demo: a boiler switches on live, the power chart switches between 1 hour, 24 hours and 7 days with hover details, the supplier plan comparison, then the meter details page with the raw telegram](docs/dashboard-demo.gif)
+![Animated demo: a boiler switches on live, the power chart switches between 1 hour, 24 hours and 7 days with hover details, the supplier plan comparison, then the meter details page with the raw telegram](assets/dashboard-demo.gif)
 
 <sub>Demo data and a simulated meter.</sub>
 </details>
@@ -34,7 +34,7 @@ Python standard library only: no packages to install, no cloud, and data stays o
 | **Kaifa MA110M** (single-phase) on **macOS** | Built and used on a real meter |
 | **Kaifa MA309M** (3-phase) | Same telegram codes; per-phase values are covered by tests with a synthetic telegram, not yet run on a real meter |
 | **Linux** (e.g. Raspberry Pi) | Cable detection covered by tests, not yet run on real hardware |
-| **Tariff counter labels** | T1 = peak and T3 = off-peak is inferred from IEC's time-of-use schedule and still unconfirmed ([`METER.md`](METER.md) §8) |
+| **Tariff counter labels** | T1 = peak and T3 = off-peak is inferred from IEC's time-of-use schedule and still unconfirmed ([`docs/meter.md`](docs/meter.md) §8) |
 
 Reports from other meters and systems are welcome as issues.
 
@@ -44,7 +44,7 @@ Reports from other meters and systems are welcome as issues.
 - **Cable:** a P1 USB cable (FTDI FT232RL, RJ12, inverted serial, sold as a "Dutch smart meter P1 cable"). A plain USB-serial adapter won't work, because the P1 signal is inverted. macOS and Linux include the driver.
 - **Computer:** macOS or Linux with **Python 3.9+** (tested on 3.9 and 3.14). Windows is not supported: the serial code uses `termios`.
 
-The port sends **115200 8N1, inverted**, one telegram per second, with Israeli tariff codes `1-0:1.8.11 / .12 / .13`. See [`METER.md`](METER.md) §3–4.
+The port sends **115200 8N1, inverted**, one telegram per second, with Israeli tariff codes `1-0:1.8.11 / .12 / .13`. See [`docs/meter.md`](docs/meter.md) §3–4.
 
 ## Quick start
 
@@ -83,6 +83,13 @@ A log from before this check existed is claimed by the first meter whose counter
 
 **3-phase meters:** the dashboard shows voltage and current per phase (L1 / L2 / L3). The SQLite log keeps L1 voltage and current; energy, power and cost cover all phases.
 
+## Documentation
+
+- [Meter and P1 port](docs/meter.md) covers meter readings, the P1 protocol, IEC tariffs, and the official references.
+- [ESP32 board notes](docs/esp32-board.md) cover the board on hand, with close-ups, pin labels, and firmware details.
+- [Standalone ESP32 reader](docs/esp32-reader.md) covers parts and wiring for an always-on reader.
+- [July 2026 supplier plans](docs/supplier-plans-2026-07.md) records the electricity offers used by the dashboard.
+
 ## Run in the background
 
 ### macOS (at login)
@@ -102,7 +109,7 @@ If the project is in `~/Documents`, `~/Desktop` or `~/Downloads`, macOS may ask 
 | Stop | `launchctl bootout gui/$(id -u)/local.iec-kaifa-p1-dashboard` |
 | Log | `~/Library/Logs/iec-kaifa-p1-dashboard.log` |
 
-Logging pauses while the Mac sleeps. See [`ESP32-READER.md`](ESP32-READER.md) for an always-on reader.
+Logging pauses while the Mac sleeps. See [`docs/esp32-reader.md`](docs/esp32-reader.md) for an always-on reader.
 
 ### Linux (at boot, systemd)
 
@@ -166,11 +173,9 @@ Bad parameters return `400`.
 | `plans.json` | Supplier offers for the plan comparison |
 | `launchd/` | macOS login-item template |
 | `tests/` | Unit tests (stdlib `unittest`) and a masked sample telegram |
-| [`METER.md`](METER.md) | Everything known about the meter, the P1 port, IEC tariffs and official documentation |
-| [`ESP32-READER.md`](ESP32-READER.md) | Parts, wiring and plan for a standalone ESP32 P1 reader |
-| [`ESP32-BOARD.md`](ESP32-BOARD.md) | The ESP32 board on hand: hardware, chip, eFuses, flash layout, firmware and backup |
-| `docs/` | README screenshots and animated demo (demo data) |
-| `reference/` | Datasheets, standards, certificates, tariffs, a redacted meter photo and an ESP32 board photo |
+| [`docs/`](docs/) | Technical guides and supplier plan notes |
+| [`assets/`](assets/) | Dashboard screenshots and animated demo using demo data |
+| [`reference/`](reference/) | [ESP32 board photos](reference/esp32/), [meter photo and certificates](reference/meter/), [P1 standard and cable manual](reference/p1/), and [IEC tariff sheet](reference/tariffs/iec-electricity-tariffs-2026-07.pdf) |
 | `data/`, `config.json` | Your usage log and prices. Created at runtime and **git-ignored** |
 
 ## Tests

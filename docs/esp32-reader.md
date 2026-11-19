@@ -2,7 +2,7 @@
 
 **Goal:** read the meter around the clock without the Mac. A small Wi-Fi board plugs into the P1 port and runs on the port's own 5 V supply. It keeps recording while the Mac sleeps, and the dashboard catches up when the Mac wakes.
 
-Specs below come from the DSMR 5.0.2 P1 standard (`reference/dsmr-5.0.2-p1-companion-standard.pdf`, §5–6) and from what we measured on this meter (`METER.md` §3).
+Specs below come from the [DSMR 5.0.2 P1 standard](../reference/p1/dsmr-5.0.2-p1-companion-standard.pdf), §5–6, and from what we measured on this meter (`meter.md` §3).
 
 ## Parts
 
@@ -75,7 +75,7 @@ Prices are rough AliExpress ranges, not checked. The links are the ones klimofey
 
 ### Option A: ESP32 on a screw-terminal board (recommended; no soldering except the cable)
 
-> **On hand since 18 Nov 2026:** a 30-pin ESP32-WROOM-32 (CH340C, USB-C) on a pin-header expansion board, so the first two rows are covered, with Dupont wires instead of screw terminals. Details in [`ESP32-BOARD.md`](ESP32-BOARD.md).
+> **On hand since 18 Nov 2026:** a 30-pin ESP32-WROOM-32 (CH340C, USB-C) on a pin-header expansion board, so the first two rows are covered, with Dupont wires instead of screw terminals. Details in [`esp32-board.md`](esp32-board.md).
 
 | ✓ | Item | Search for | Qty | Must have | ≈ $ |
 |---|---|---|---|---|---|
