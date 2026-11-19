@@ -47,7 +47,8 @@ _Started 18 Nov 2026 from [photos of the boards](reference/esp32/), the macOS US
 | Power block (right) | Separate **5V**, **3.3V** and **GND** pins |
 
 **Notes for the P1 build**
-- **No screw terminals.** Connect the RJ12 wires with female Dupont jumpers or crimped Dupont housings. The two 1 kΩ resistors can sit inline.
+- **No screw terminals.** The RJ12 side goes into a female RJ12 screw-terminal jack; male-to-female Dupont jumpers run from its terminals to the board's pins. The Request resistor sits in the jack's terminals; only the Data pull-up (D16 to 3V3) is at the board. See [`esp32-reader.md`](esp32-reader.md#wiring).
+- **Power from P1 goes into VIN**, with a 1000 µF capacitor across VIN and GND. This board draws more than the ESP32-C3 the power budget first assumed (see [Power budget](esp32-reader.md#power-budget)).
 - **Keep the jumper on 3.3 V.** It only affects the triplets' VCC pins; with 3.3 V there, nothing on those rows can put 5 V on a GPIO.
 - **Input-only pins:** D34, D35, VP (GPIO36) and VN (GPIO39) have no pull-ups and can't output.
 - **Strapping pins:** avoid GPIO0, 2, 5, 12 and 15 for the P1 data line. They're read at reset, and **GPIO12 high at boot sets the flash to 1.8 V**, which stops the board from booting.
