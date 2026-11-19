@@ -1,6 +1,6 @@
 # ESP32 board: everything we know
 
-_Started 18 Nov 2026 from photos of the board ([`reference/esp32-wroom32-board-photo.webp`](reference/esp32-wroom32-board-photo.webp)), the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`ESP32-READER.md`](ESP32-READER.md)._
+_Started 18 Nov 2026 from photos of the board ([`reference/esp-wroom-32-on-expansion-board.webp`](reference/esp-wroom-32-on-expansion-board.webp)), the macOS USB registry, esptool and espefuse readouts, and a full read of its 4 MB flash. §4–5 describe the board as it arrived; it has since been updated to AT v4.1.1.0 (§7). It was a gift and is the intended board for the standalone reader in [`ESP32-READER.md`](ESP32-READER.md)._
 
 ## Summary
 
@@ -14,7 +14,7 @@ _Started 18 Nov 2026 from photos of the board ([`reference/esp32-wroom32-board-p
 
 ## 1. Hardware: from the photos
 
-<img src="reference/esp32-wroom32-board-photo.webp" alt="ESP32-WROOM-32 dev board on its pin-header expansion board" width="360">
+<img src="reference/esp-wroom-32-on-expansion-board.webp" alt="ESP32-WROOM-32 dev board on its pin-header expansion board" width="360">
 
 **Dev board (top)**
 
